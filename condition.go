@@ -3,14 +3,12 @@ package kitty
 import (
 	"fmt"
 	"strings"
-
-	"xmdas-link.com/ylt/utils/api/common"
 )
 
 // SearchCondition ...
 type SearchCondition struct {
 	FormValues  map[string][]string `json:"form_values,omitempty"`
-	Page        *common.Page        `json:"page,omitempty"`
+	Page        *Page               `json:"page,omitempty"`
 	ReturnCount int                 `json:"return_count,omitempty"`
 }
 

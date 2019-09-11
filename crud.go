@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	tagexpr "github.com/bytedance/go-tagexpr"
 	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/jinzhu/gorm"
@@ -26,8 +28,8 @@ func init() {
 	}, true)
 }
 
-func queryObj(s *Structs, search *SearchCondition, db *gorm.DB) (interface{}, error) {
-	getter(s, make(map[string]interface{}), db)
+func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context) (interface{}, error) {
+	getter(s, make(map[string]interface{}), db, c)
 
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
@@ -60,16 +62,16 @@ func queryObj(s *Structs, search *SearchCondition, db *gorm.DB) (interface{}, er
 	params := make(map[string]interface{})
 	params["ms"] = s
 	params["kittys"] = kittys
-	if err = setter(s, params, db); err != nil {
+	if err = setter(s, params, db, c); err != nil {
 		return nil, err
 	}
 	return s.raw, nil
 }
 
 // CreateObj ...
-func createObj(s *Structs, search *SearchCondition, db *gorm.DB) (interface{}, error) {
+func createObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context) (interface{}, error) {
 
-	getter(s, make(map[string]interface{}), db)
+	getter(s, make(map[string]interface{}), db, c)
 
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
@@ -114,14 +116,16 @@ func createObj(s *Structs, search *SearchCondition, db *gorm.DB) (interface{}, e
 	return res, tx.Commit().Error
 }
 
-func updateObj(s *Structs, search *SearchCondition, db *gorm.DB) error {
+func updateObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context) error {
 
-	getter(s, make(map[string]interface{}), db)
+	getter(s, make(map[string]interface{}), db, c)
 
-	vm := tagexpr.New("te")
-	r := vm.MustRun(s.raw)
-	if !r.Eval("ID").(bool) {
-		return fmt.Errorf(r.Eval("ID@msg").(string))
+	if _, ok := s.FieldOk("ID"); ok {
+		vm := tagexpr.New("te")
+		r := vm.MustRun(s.raw)
+		if !r.Eval("ID").(bool) {
+			return fmt.Errorf(r.Eval("ID@msg").(string))
+		}
 	}
 
 	if err := vd.Validate(s.raw); err != nil {

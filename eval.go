@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Knetic/govaluate"
+	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 )
 
@@ -17,12 +18,13 @@ type update interface {
 	update() error
 }
 
-func getter(s *Structs, param map[string]interface{}, db *gorm.DB) error {
+func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c *gin.Context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,
 		functions: make(map[string]govaluate.ExpressionFunction),
 		params:    param,
+		c:         c,
 	}
 	expr.params["s"] = s.raw
 	expr.init()
@@ -41,12 +43,13 @@ func getter(s *Structs, param map[string]interface{}, db *gorm.DB) error {
 	return nil
 }
 
-func setter(s *Structs, param map[string]interface{}, db *gorm.DB) error {
+func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c *gin.Context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,
 		functions: make(map[string]govaluate.ExpressionFunction),
 		params:    param,
+		c:         c,
 	}
 
 	expr.init()
@@ -60,13 +63,13 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB) error {
 				for i := 0; i < len; i++ {
 					rvdata := rv.Index(i)
 					sdata := NewStr(rvdata.Interface())
-					if err := setter(sdata, param, db); err != nil {
+					if err := setter(sdata, param, db, c); err != nil {
 						return err
 					}
 				}
 			} else if tk.TypeOfField.Kind() == reflect.Struct {
 				sdata := NewStr(f.Value())
-				if err := setter(sdata, param, db); err != nil {
+				if err := setter(sdata, param, db, c); err != nil {
 					return err
 				}
 			}
@@ -76,7 +79,7 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB) error {
 				a := strings.LastIndex(setter, "(")
 				b := strings.Index(setter, ".")
 				model := setter[a+1 : b]
-				res, err := queryObj(NewModelStruct(model), &SearchCondition{}, db)
+				res, err := queryObj(NewModelStruct(model), &SearchCondition{}, db, c)
 				if err != nil {
 					return err
 				}

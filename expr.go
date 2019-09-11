@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/fatih/structs"
 	"github.com/iancoleman/strcase"
 	"github.com/jinzhu/gorm"
@@ -18,10 +20,14 @@ type expr struct {
 	f         *structs.Field
 	functions map[string]govaluate.ExpressionFunction
 	params    map[string]interface{}
+	c         *gin.Context
 }
 
 func (e *expr) init() {
 	functions := e.functions
+	for k, v := range exprFuncs {
+		functions[k] = v
+	}
 
 	functions["len"] = func(args ...interface{}) (interface{}, error) {
 		length := reflect.ValueOf(args[0]).Len()
@@ -30,14 +36,24 @@ func (e *expr) init() {
 	functions["sprintf"] = func(args ...interface{}) (interface{}, error) {
 		return fmt.Sprintf(args[0].(string), args[1:]...), nil
 	}
+	functions["default"] = func(args ...interface{}) (interface{}, error) {
+		if reflect.ValueOf(e.f.Value()).IsNil() {
+			return args[0], nil
+		}
+		return nil, nil
+	}
 	functions["current"] = func(args ...interface{}) (interface{}, error) {
 		s := args[0].(string)
 		switch s {
 		case "loginid":
-			return 7, nil
-		default:
-			return nil, fmt.Errorf("current function: unexpert %s", s)
+			//登录的信息存在gin的上下文。
+			user := e.c.GetStringMapString("AuthUser")
+			if uid, ok := user["id"]; ok {
+				return uid, nil
+			}
+			return 0, nil
 		}
+		return nil, fmt.Errorf("current function: unexpert %s", s)
 	}
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
 		field := args[0].(string)

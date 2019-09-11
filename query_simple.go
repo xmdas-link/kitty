@@ -62,16 +62,19 @@ func (q *simpleQuery) create() (interface{}, error) {
 
 func (q *simpleQuery) update() error {
 
+	whereCount := 0
 	modelName := q.Result.Name()
 	qryformat := q.ModelStructs.buildFormParamQuery(modelName, "ID")
-	if qryformat == nil {
-		return fmt.Errorf("unable update %s, not found param:id ", modelName)
+	tx := q.db.Model(q.Result.raw)
+	if qryformat != nil {
+		//	return fmt.Errorf("unable update %s, not found param:id ", modelName)
+		w := fmt.Sprintf("ID %s", qryformat.field)
+		tx = tx.Where(w, qryformat.v...)
+		whereCount++
 	}
-	w := fmt.Sprintf("ID %s", qryformat.field)
-	tx := q.db.Model(q.Result.raw).Where(w, qryformat.v...)
 
 	for _, f := range q.ModelStructs.Fields() {
-		if k := f.Tag("kitty"); strings.Contains(k, "param") && !f.IsZero() {
+		if k := f.Tag("kitty"); strings.Contains(k, "param") && !strings.Contains(k, "condition") && !f.IsZero() {
 			bindfield := GetSub(k, "param")
 			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
 				field := ToCamel(v[1])
@@ -83,6 +86,21 @@ func (q *simpleQuery) update() error {
 				}
 			}
 		}
+	}
+	for _, f := range q.ModelStructs.Fields() {
+		if k := f.Tag("kitty"); strings.Contains(k, "condition") && !f.IsZero() {
+			bindfield := GetSub(k, "param")
+			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
+				field := ToCamel(v[1])
+				qryformat := q.ModelStructs.buildFormParamQuery(modelName, field)
+				w := fmt.Sprintf("%s %s", v[1], qryformat.field)
+				tx = tx.Where(w, qryformat.v...)
+				whereCount++
+			}
+		}
+	}
+	if whereCount == 0 {
+		return fmt.Errorf("unable update %s, where condition is needed", modelName)
 	}
 	tx = tx.Update(q.Result.raw)
 

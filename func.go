@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/Knetic/govaluate"
 	"github.com/iancoleman/strcase"
 	"github.com/jinzhu/gorm"
-	"xmdas-link.com/ylt/utils/api/common"
 )
 
 // ToCamel 对id的特别处理。 PayID UserID 。
@@ -93,7 +93,7 @@ func pages(db *gorm.DB, search *SearchCondition, result interface{}, scan bool) 
 		}
 
 		// 页数
-		pageInfo := common.MakePage(search.Page.Page, search.Page.Limit, uint32(total))
+		pageInfo := MakePage(search.Page.Page, search.Page.Limit, uint32(total))
 		search.Page.Limit = pageInfo.Limit
 		search.Page.Page = pageInfo.Page
 		search.Page.Total = uint32(total)
@@ -118,4 +118,17 @@ func pages(db *gorm.DB, search *SearchCondition, result interface{}, scan bool) 
 	search.ReturnCount = int(tx.RowsAffected)
 
 	return result, nil
+}
+
+var (
+	exprFuncs map[string]govaluate.ExpressionFunction
+)
+
+func init() {
+	exprFuncs = make(map[string]govaluate.ExpressionFunction)
+}
+
+// RegisterFunc ...
+func RegisterFunc(name string, func1 govaluate.ExpressionFunction) {
+	exprFuncs[name] = func1
 }
