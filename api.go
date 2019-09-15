@@ -1,46 +1,16 @@
 package kitty
 
 import (
-	"errors"
 	"net/url"
 	"strconv"
-
-	"github.com/gin-gonic/gin"
-	jsoniter "github.com/json-iterator/go"
-
-	"github.com/jinzhu/gorm"
 )
 
 // CRUD for web api
 type CRUD struct {
 	Resource *Resource
 	Form     url.Values
-	DB       *gorm.DB
-	Ctx      *gin.Context
-}
-
-// CrudResult 结果
-type CrudResult struct {
-	Code  int         `json:"code,omitempty"`
-	Data  interface{} `json:"data,omitempty"`
-	Page  *Page       `json:"page,omitempty"`
-	Count *int        `json:"count,omitempty"`
-}
-
-type Result struct {
-	CrudResult
-	NameAs map[string][]string `json:"-"`
-}
-
-// MarshalJSON ...
-func (c Result) MarshalJSON() ([]byte, error) {
-	cfg := jsoniter.Config{}.Froze()
-	cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, []string{}, ""})
-	for k, v := range c.NameAs {
-		cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, v, k})
-	}
-	jsoniter.RegisterTypeEncoder("time.Time", &timeAsString{})
-	return cfg.Marshal(c.CrudResult)
+	Crud     CRUDInterface
+	Ctx      context
 }
 
 // List 。
@@ -61,72 +31,23 @@ func (c *CRUD) List() (interface{}, error) {
 	if Page.Limit > 0 && Page.Page > 0 {
 		s.Page = Page
 	}
-	return c.do(s, "R", true)
+	return c.Crud.Do(s, "R", c.Ctx)
 }
 
 // One 单条记录
 func (c *CRUD) One() (interface{}, error) {
 	s := &SearchCondition{FormValues: c.Form}
-	return c.do(s, "R", false)
+	return c.Crud.Do(s, "R", c.Ctx)
 }
 
 // Update ...
 func (c *CRUD) Update() (interface{}, error) {
 	s := &SearchCondition{FormValues: c.Form}
-	return c.do(s, "U", false)
+	return c.Crud.Do(s, "U", c.Ctx)
 }
 
 // Create ...
 func (c *CRUD) Create() (interface{}, error) {
 	s := &SearchCondition{FormValues: c.Form}
-	return c.do(s, "C", false)
-}
-
-func (c *CRUD) do(search *SearchCondition, action string, multi bool) (interface{}, error) {
-
-	if err := search.CheckParamValid(c.Resource.ModelName); err != nil {
-		return nil, err
-	}
-
-	s := NewModelStruct(c.Resource.ModelName)
-	if s == nil {
-		return nil, errors.New("error in create model")
-	}
-	if err := s.ParseFormValues(search.FormValues); err != nil {
-		return nil, err
-	}
-
-	var (
-		res interface{}
-		err error
-	)
-
-	switch action {
-	case "C":
-		res, err = createObj(s, search, c.DB, c.Ctx)
-	case "R":
-		res, err = queryObj(s, search, c.DB, c.Ctx)
-	case "U":
-		err = updateObj(s, search, c.DB, c.Ctx)
-	default:
-		return nil, errors.New("unknown model action")
-	}
-	if res != nil {
-		result := CrudResult{
-			Code: 1,
-			Data: res,
-		}
-		NameAs := make(map[string][]string)
-		s.nameAs(NameAs)
-		if search.Page != nil {
-			result.Page = search.Page
-			result.Count = new(int)
-			*result.Count = search.ReturnCount
-		}
-		return Result{
-			result,
-			NameAs,
-		}, nil
-	}
-	return nil, err
+	return c.Crud.Do(s, "C", c.Ctx)
 }

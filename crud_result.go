@@ -1,0 +1,33 @@
+package kitty
+
+import jsoniter "github.com/json-iterator/go"
+
+// CrudResult 结果
+type CrudResult struct {
+	Code  int         `json:"code,omitempty"`
+	Data  interface{} `json:"data,omitempty"`
+	Page  *Page       `json:"page,omitempty"`
+	Count *int        `json:"count,omitempty"`
+}
+
+// Result 。
+type Result struct {
+	CrudResult
+	NameAs map[string][]string `json:"-"`
+	Cfg    jsoniter.API
+}
+
+// JsonAPI 可以由外部提供jsonapi
+func (c *Result) JsonAPI(j jsoniter.API) {
+	c.Cfg = j
+}
+
+// MarshalJSON ...
+func (c *Result) MarshalJSON() ([]byte, error) {
+	c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, []string{}, ""})
+	for k, v := range c.NameAs {
+		c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, v, k})
+	}
+	jsoniter.RegisterTypeEncoder("time.Time", &timeAsString{})
+	return c.Cfg.Marshal(c.CrudResult)
+}

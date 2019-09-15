@@ -5,8 +5,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/gin-gonic/gin"
-
 	"github.com/fatih/structs"
 	"github.com/iancoleman/strcase"
 	"github.com/jinzhu/gorm"
@@ -20,7 +18,7 @@ type expr struct {
 	f         *structs.Field
 	functions map[string]govaluate.ExpressionFunction
 	params    map[string]interface{}
-	c         *gin.Context
+	ctx       context
 }
 
 func (e *expr) init() {
@@ -42,19 +40,16 @@ func (e *expr) init() {
 		}
 		return nil, nil
 	}
+
 	functions["current"] = func(args ...interface{}) (interface{}, error) {
 		s := args[0].(string)
 		switch s {
 		case "loginid":
-			//登录的信息存在gin的上下文。
-			user := e.c.GetStringMapString("AuthUser")
-			if uid, ok := user["id"]; ok {
-				return uid, nil
-			}
-			return 0, nil
+			return e.ctx.CurrentUID(), nil
 		}
 		return nil, fmt.Errorf("current function: unexpert %s", s)
 	}
+
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
 		field := args[0].(string)
 		if f, ok := e.s.FieldOk(ToCamel(field)); ok {

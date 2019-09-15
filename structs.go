@@ -50,7 +50,7 @@ func newObj(name string) interface{} {
 
 // NewStruct returns a new *Struct with the struct s. It panics if the s's kind is
 // not struct.
-func newStruct(typeName string) *Structs {
+func NewStruct(typeName string) *Structs {
 	raw := newObj(typeName)
 	if raw == nil {
 		return nil
@@ -66,7 +66,7 @@ func NewStr(v interface{}) *Structs {
 
 // NewModelStruct 以名称构建
 func NewModelStruct(modelName string) *Structs {
-	return newStruct("model." + ToCamel(modelName))
+	return NewStruct("model." + ToCamel(modelName))
 }
 
 // CallMethod .

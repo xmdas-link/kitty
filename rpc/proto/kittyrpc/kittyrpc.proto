@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package go.micro.srv.kittyrpc;
+
+service Kittyrpc {
+	rpc Call(Request) returns (Response) {}
+}
+
+message Request {
+	string model = 1;
+	string action = 2;
+	string search = 3;
+}
+
+message Response {
+	string msg = 1;
+}

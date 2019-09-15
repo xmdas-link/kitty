@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gin-gonic/gin"
-
 	tagexpr "github.com/bytedance/go-tagexpr"
 	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/jinzhu/gorm"
 )
+
+//CRUDInterface ...
+type CRUDInterface interface {
+	Do(search *SearchCondition, action string, c context) (interface{}, error)
+}
 
 func init() {
 	vd.RegFunc("time", func(args ...interface{}) bool {
@@ -28,7 +31,7 @@ func init() {
 	}, true)
 }
 
-func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context) (interface{}, error) {
+func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) (interface{}, error) {
 	getter(s, make(map[string]interface{}), db, c)
 
 	if err := vd.Validate(s.raw); err != nil {
@@ -69,7 +72,7 @@ func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context) 
 }
 
 // CreateObj ...
-func createObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context) (interface{}, error) {
+func createObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) (interface{}, error) {
 
 	getter(s, make(map[string]interface{}), db, c)
 
@@ -116,7 +119,7 @@ func createObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context)
 	return res, tx.Commit().Error
 }
 
-func updateObj(s *Structs, search *SearchCondition, db *gorm.DB, c *gin.Context) error {
+func updateObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) error {
 
 	getter(s, make(map[string]interface{}), db, c)
 

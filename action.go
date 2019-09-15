@@ -3,14 +3,13 @@ package kitty
 import (
 	"errors"
 
-	"github.com/gin-gonic/gin"
 	"github.com/json-iterator/go"
 
 	"github.com/jinzhu/gorm"
 )
 
 // ActionCRUD ...
-func ActionCRUD(db *gorm.DB, model string, search *SearchCondition, c *gin.Context, ac string, multi bool) (interface{}, error) {
+func ActionCRUD(db *gorm.DB, model string, search *SearchCondition, ac string) (interface{}, error) {
 
 	s := NewModelStruct(model)
 	if s == nil {
@@ -27,11 +26,11 @@ func ActionCRUD(db *gorm.DB, model string, search *SearchCondition, c *gin.Conte
 
 	switch ac {
 	case "C":
-		res, err = createObj(s, search, db, c)
+	//	res, err = createObj(s, search, db)
 	case "R":
-		res, err = queryObj(s, search, db, c)
+	//	res, err = queryObj(s, search, db)
 	case "U":
-		err = updateObj(s, search, db, c)
+	//	err = updateObj(s, search, db)
 	default:
 		return nil, errors.New("unknown model action")
 	}

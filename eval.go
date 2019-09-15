@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/Knetic/govaluate"
-	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 )
 
@@ -18,13 +17,13 @@ type update interface {
 	update() error
 }
 
-func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c *gin.Context) error {
+func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,
 		functions: make(map[string]govaluate.ExpressionFunction),
 		params:    param,
-		c:         c,
+		ctx:       c,
 	}
 	expr.params["s"] = s.raw
 	expr.init()
@@ -43,13 +42,13 @@ func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c *gin.Contex
 	return nil
 }
 
-func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c *gin.Context) error {
+func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,
 		functions: make(map[string]govaluate.ExpressionFunction),
 		params:    param,
-		c:         c,
+		ctx:       c,
 	}
 
 	expr.init()
