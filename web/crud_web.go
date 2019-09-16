@@ -89,9 +89,8 @@ func (web *WebCrud) Update(c *gin.Context) {
 		fail(c, err)
 	} else if res != nil {
 		success(c, res)
-
 	} else {
-		success(c, "")
+		success(c, gin.H{"code": 1})
 	}
 }
 
@@ -117,7 +116,7 @@ func (web *WebCrud) Create(c *gin.Context) {
 	} else if res != nil {
 		success(c, res)
 	} else {
-		success(c, "")
+		success(c, gin.H{"code": 1})
 	}
 }
 

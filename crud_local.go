@@ -42,21 +42,23 @@ func (crud *LocalCrud) Do(search *SearchCondition, action string, c context) (in
 	default:
 		return nil, errors.New("unknown model action")
 	}
-	if res != nil {
+	if err == nil {
+		nameAs := make(map[string][]string)
 		result := CrudResult{
 			Code: 1,
-			Data: res,
 		}
-		NameAs := make(map[string][]string)
-		s.nameAs(NameAs)
-		if search.Page != nil {
-			result.Page = search.Page
-			result.Count = new(int)
-			*result.Count = search.ReturnCount
+		if res != nil {
+			result.Data = res
+			s.nameAs(nameAs)
+			if search.Page != nil {
+				result.Page = search.Page
+				result.Count = new(int)
+				*result.Count = search.ReturnCount
+			}
 		}
 		return &Result{
 			result,
-			NameAs,
+			nameAs,
 			jsoniter.Config{}.Froze(),
 		}, nil
 	}
