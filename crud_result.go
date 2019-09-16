@@ -4,10 +4,11 @@ import jsoniter "github.com/json-iterator/go"
 
 // CrudResult 结果
 type CrudResult struct {
-	Code  int         `json:"code,omitempty"`
-	Data  interface{} `json:"data,omitempty"`
-	Page  *Page       `json:"page,omitempty"`
-	Count *int        `json:"count,omitempty"`
+	Code    int         `json:"code"`
+	Data    interface{} `json:"data,omitempty"`
+	Page    *Page       `json:"page,omitempty"`
+	Count   *int        `json:"count,omitempty"`
+	Message string      `json:"message,omitempty"`
 }
 
 // Result 。

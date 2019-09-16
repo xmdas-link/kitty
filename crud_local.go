@@ -55,6 +55,9 @@ func (crud *LocalCrud) Do(search *SearchCondition, action string, c context) (in
 				result.Count = new(int)
 				*result.Count = search.ReturnCount
 			}
+		} else if action == "R" {
+			result.Code = 0
+			result.Message = "没有记录"
 		}
 		return &Result{
 			result,
