@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xmdas-link/filter"
 	"github.com/xmdas-link/kitty"
 )
 
@@ -19,8 +20,8 @@ func (web *WebCrud) RoutePath() string {
 }
 
 func success(c *gin.Context, data interface{}) {
-	//	c.JSON(http.StatusOK, filter.H{Ctx: c, Data: data})
-	c.JSON(http.StatusOK, data)
+	c.JSON(http.StatusOK, filter.H{Ctx: c, Data: data})
+	//	c.JSON(http.StatusOK, data)
 }
 func fail(c *gin.Context, err error) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": err.Error()})
