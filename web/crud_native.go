@@ -14,7 +14,7 @@ func (web *WebCrud) List2(w http.ResponseWriter, r *http.Request) {
 		Resource: web.Resource,
 		Form:     r.Form,
 		Crud:     web.Crud,
-		Ctx:      &nativeKittyCtx{c: r.Context(), ctx: web.Ctx},
+		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.List, &nativeResponse{W: w})
 }
@@ -27,7 +27,7 @@ func (web *WebCrud) One2(w http.ResponseWriter, r *http.Request) {
 		Resource: web.Resource,
 		Form:     r.Form,
 		Crud:     web.Crud,
-		Ctx:      &nativeKittyCtx{c: r.Context(), ctx: web.Ctx},
+		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.One, &nativeResponse{W: w})
 }
@@ -40,7 +40,7 @@ func (web *WebCrud) Update2(w http.ResponseWriter, r *http.Request) {
 		Resource: web.Resource,
 		Form:     r.PostForm,
 		Crud:     web.Crud,
-		Ctx:      &nativeKittyCtx{c: r.Context(), ctx: web.Ctx},
+		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.Update, &nativeResponse{W: w})
 }
@@ -51,7 +51,7 @@ func (web *WebCrud) Create2(w http.ResponseWriter, r *http.Request) {
 
 	if len(r.PostForm) == 0 {
 		r := &nativeResponse{W: w}
-		r.Fail(errors.New("nothing params"))
+		r.fail(errors.New("nothing params"))
 		return
 	}
 
@@ -59,7 +59,7 @@ func (web *WebCrud) Create2(w http.ResponseWriter, r *http.Request) {
 		Resource: web.Resource,
 		Form:     r.PostForm,
 		Crud:     web.Crud,
-		Ctx:      &nativeKittyCtx{c: r.Context(), ctx: web.Ctx},
+		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.Create, &nativeResponse{W: w})
 }

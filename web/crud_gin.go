@@ -15,7 +15,7 @@ func (web *WebCrud) List(c *gin.Context) {
 		Resource: web.Resource,
 		Form:     c.Request.Form,
 		Crud:     web.Crud,
-		Ctx:      &ginKittyCtx{c: c, ctx: web.Ctx},
+		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.List, &ginResponse{C: c})
 }
@@ -28,10 +28,9 @@ func (web *WebCrud) One(c *gin.Context) {
 		Resource: web.Resource,
 		Form:     c.Request.Form,
 		Crud:     web.Crud,
-		Ctx:      &ginKittyCtx{c: c, ctx: web.Ctx},
+		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.One, &ginResponse{C: c})
-
 }
 
 // Update ...
@@ -42,10 +41,9 @@ func (web *WebCrud) Update(c *gin.Context) {
 		Resource: web.Resource,
 		Form:     c.Request.PostForm,
 		Crud:     web.Crud,
-		Ctx:      &ginKittyCtx{c: c, ctx: web.Ctx},
+		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.Update, &ginResponse{C: c})
-
 }
 
 // Create ...
@@ -54,7 +52,7 @@ func (web *WebCrud) Create(c *gin.Context) {
 
 	if len(c.Request.PostForm) == 0 {
 		r := &ginResponse{C: c}
-		r.Fail(errors.New("nothing params"))
+		r.fail(errors.New("nothing params"))
 		return
 	}
 
@@ -62,8 +60,7 @@ func (web *WebCrud) Create(c *gin.Context) {
 		Resource: web.Resource,
 		Form:     c.Request.PostForm,
 		Crud:     web.Crud,
-		Ctx:      &ginKittyCtx{c: c, ctx: web.Ctx},
+		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.Create, &ginResponse{C: c})
-
 }

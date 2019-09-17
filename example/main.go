@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/xmdas-link/kitty"
 	"github.com/xmdas-link/kitty/example/model"
 	"github.com/xmdas-link/kitty/web"
 )
@@ -38,37 +37,34 @@ func main() {
 }
 
 func FormCreateUser(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormCreateUser{}, "user")
-	web := &web.WebCrud{Resource: res, Crud: &kitty.LocalCrud{
-		Model: res.ModelName,
-		DB:    DB,
-	}}
+	web := web.NewWeb(&model.FormCreateUser{}, "user", DB, &currentCtx{})
 	r.POST(web.RoutePath()+"/create", web.Create)
 }
 
 func FormUpdateUser(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormUpdateUser{}, "user")
-	web := &web.WebCrud{Resource: res, Crud: &kitty.LocalCrud{
-		Model: res.ModelName,
-		DB:    DB,
-	}}
+	web := web.NewWeb(&model.FormUpdateUser{}, "user", DB, &currentCtx{})
 	r.POST(web.RoutePath()+"/update", web.Update)
 }
 
 func FormUser(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormUser{}, "user")
-	web := &web.WebCrud{Resource: res, Crud: &kitty.LocalCrud{
-		Model: res.ModelName,
-		DB:    DB,
-	}}
+	web := web.NewWeb(&model.FormUser{}, "user", DB, &currentCtx{})
 	r.GET(web.RoutePath()+"/one", web.One)
 }
 
 func FormUserList(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormUserList{}, "user")
-	web := &web.WebCrud{Resource: res, Crud: &kitty.LocalCrud{
-		Model: res.ModelName,
-		DB:    DB,
-	}}
+	web := web.NewWeb(&model.FormUserList{}, "user", DB, &currentCtx{})
 	r.GET(web.RoutePath()+"/list", web.List)
+}
+
+type currentCtx struct {
+}
+
+func (*currentCtx) GetUID(ctx interface{}) string {
+	//登录的信息存在gin的上下文。
+	c := ctx.(*gin.Context)
+	user := c.GetStringMapString("AuthUser")
+	if uid, ok := user["id"]; ok {
+		return uid
+	}
+	return ""
 }

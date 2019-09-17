@@ -9,19 +9,19 @@ import (
 )
 
 type webResponse interface {
-	Success(interface{})
-	Fail(error)
+	success(interface{})
+	fail(error)
 }
 
 type ginResponse struct {
 	C *gin.Context
 }
 
-func (c *ginResponse) Success(data interface{}) {
+func (c *ginResponse) success(data interface{}) {
 	c.C.JSON(http.StatusOK, filter.H{Ctx: c.C, Data: data})
 }
 
-func (c *ginResponse) Fail(err error) {
+func (c *ginResponse) fail(err error) {
 	c.C.JSON(http.StatusOK, gin.H{"code": 0, "message": err.Error()})
 }
 
@@ -34,14 +34,14 @@ func (c *nativeResponse) write(data interface{}) {
 	c.W.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(c.W).Encode(data)
 }
-func (c *nativeResponse) Success(data interface{}) {
+func (c *nativeResponse) success(data interface{}) {
 	c.write(data)
 }
 
-func (c *nativeResponse) Fail(err error) {
+func (c *nativeResponse) fail(err error) {
 	res := map[string]interface{}{
 		"code": 0,
-		"msg":  err.Error(),
+		"message":  err.Error(),
 	}
 	c.write(res)
 }
