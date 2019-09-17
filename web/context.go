@@ -8,8 +8,7 @@ import (
 
 // ExternCtx 提供由外部定义的，根据上下文获得当前uid的登录信息
 type ExternCtx interface {
-	GetUID(*gin.Context) string
-	GetUIDFromContext(context.Context) string
+	GetUID(interface{}) string
 }
 
 type nativeKittyCtx struct {
@@ -18,7 +17,7 @@ type nativeKittyCtx struct {
 }
 
 func (c *nativeKittyCtx) CurrentUID() string {
-	return c.ctx.GetUIDFromContext(c.c)
+	return c.ctx.GetUID(c.c)
 }
 
 type ginKittyCtx struct {
