@@ -486,10 +486,10 @@ func (field *FormField) toQuery() *fieldQryFormat {
 				return &fieldQryFormat{field: "IN (?)", v: []interface{}{v}}
 			} else if len == 2 {
 				if v[0] == "" {
-					compare = "<"
+					compare = "<="
 					singleValue = reflect.ValueOf(v[1])
 				} else if v[1] == "" {
-					compare = ">"
+					compare = ">="
 					singleValue = reflect.ValueOf(v[0])
 				} else {
 					return &fieldQryFormat{field: "BETWEEN ? AND ?", v: []interface{}{v[0], v[1]}}

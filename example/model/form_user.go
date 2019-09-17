@@ -13,9 +13,10 @@ type FormCreateUser struct {
 // FormUpdateUser 更新user.
 type FormUpdateUser struct {
 	ID                 *uint32 `json:"-" kitty:"param:user.id;" te:"$>0;msg:'please input id'"`
-	Name               *string `json:"-" kitty:"param:user.name;" vd:"len($)>0;msg:'name required'"`
+	Name               *string `json:"-" kitty:"param:user.name;"`
 	Age                *string `json:"-" kitty:"param:user.age;"`
 	Department         *string `json:"-" kitty:"param:user.department;"`
+	TestID             *User   `json:"-" kitty:"getter:rd('id.id')" vd:"$!=nil;msg:'id not exist'"`
 	TestNameDumplicate *User   `json:"-" kitty:"getter:rd('name.name')" vd:"$==nil||(TestNameDumplicate.ID)$==(ID)$;msg:'name duplicate'"`
 	User               User    `json:"-" kitty:"master"`
 }
@@ -30,7 +31,7 @@ type FormUser struct {
 }
 
 // FormUserList 用户列表
-// 查询条件: 创建时间 / 部门 . 
+// 查询条件: 创建时间 / 部门 .
 // 规则：
 type FormUserList struct {
 	Data       []*User `kitty:"bind:user.*;bindresult;"`

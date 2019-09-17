@@ -16,7 +16,8 @@ type query struct {
 }
 
 func (q *query) prepare() *gorm.DB {
-	tx := q.db //.Model(q.ModelStructs.raw)
+	tx := q.db
+	tx = tx.Model(q.ModelStructs.raw)
 	for _, v := range q.queryString {
 		tx = tx.Where(v.field, v.v...)
 	}
