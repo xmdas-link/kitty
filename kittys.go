@@ -3,6 +3,7 @@ package kitty
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -136,6 +137,14 @@ func (ks *kittys) having() *fieldQryFormat {
 		if bind.Having {
 			if q := ks.ModelStructs.buildFormParamQuery(ks.result.Name(), bind.FieldName); q != nil {
 				q.field = bind.funcName() + " " + q.field
+				// having 的统计是不是都应该是整型值？0917
+				for i, v := range q.v {
+					switch v.(type) {
+					case string:
+						x, _ := strconv.ParseInt(v.(string), 10, 64)
+						q.v[i] = reflect.ValueOf(x).Interface()
+					}
+				}
 				return q //sum(xxx) > 50
 			}
 		}
