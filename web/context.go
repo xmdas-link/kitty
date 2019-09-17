@@ -6,24 +6,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// ExternCtx 提供由外部定义的，根据上下文获得当前uid的登录信息
+type ExternCtx interface {
+	GetUID(*gin.Context) string
+	GetUIDFromContext(context.Context) string
+}
+
 type nativeKittyCtx struct {
-	ctx context.Context
+	c   context.Context
+	ctx ExternCtx
 }
 
 func (c *nativeKittyCtx) CurrentUID() string {
-	//登录的信息存在gin的上下文。
-	return ""
+	return c.ctx.GetUIDFromContext(c.c)
 }
 
 type ginKittyCtx struct {
-	*gin.Context
+	c   *gin.Context
+	ctx ExternCtx
 }
 
 func (c *ginKittyCtx) CurrentUID() string {
 	//登录的信息存在gin的上下文。
-	user := c.GetStringMapString("AuthUser")
-	if uid, ok := user["id"]; ok {
-		return uid
-	}
-	return ""
+	return c.ctx.GetUID(c.c)
 }

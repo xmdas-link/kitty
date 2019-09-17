@@ -9,6 +9,7 @@ import (
 type WebCrud struct {
 	Resource *kitty.Resource
 	Crud     kitty.CRUDInterface
+	Ctx      ExternCtx
 }
 
 func (web *WebCrud) RoutePath() string {
