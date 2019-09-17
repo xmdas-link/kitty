@@ -2,6 +2,7 @@ package kitty
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 )
@@ -27,9 +28,9 @@ func (q *joinQuery) prepare() *gorm.DB {
 	for _, v := range q.Where {
 		tx = tx.Where(v.field, v.v...)
 	}
-	for _, v := range q.GroupBy {
-		tx = tx.Group(v)
-	}
+	//for _, v := range q.GroupBy {
+	tx = tx.Group(strings.Join(q.GroupBy, ", "))
+	//}
 	if q.Having != nil {
 		tx = tx.Having(q.Having.field, q.Having.v...)
 	}

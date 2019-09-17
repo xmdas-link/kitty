@@ -53,7 +53,7 @@ type kitty struct {
 	Master     bool           // 主表
 	JoinAction string         // 连接方式 left / right / inner
 	JoinTo     string         // 关联的模型
-	Group      []string       // group by a, b
+	Group      []string       // group by a, b  需定义为输出的字段名称。
 	structs    *Structs
 }
 
@@ -105,14 +105,16 @@ func (j *kitty) fieldName(bindField string) string {
 	return s
 }*/
 func (j *kitty) groupBy() []string {
-	s := []string{}
-	if len(j.Group) > 0 {
-		for _, v := range j.Group {
-			s = append(s, j.fieldName(v))
-		}
-	}
-	return s
+//	s := []string{}
+//	if len(j.Group) > 0 {
+//		for _, v := range j.Group {
+//			s = append(s, j.fieldName(v))
+//		}
+//	}
+//	return s
+	return j.Group 
 }
+
 func (j *kitty) joins(s *Structs, joinTo *kitty) *fieldQryFormat {
 	join := fmt.Sprintf("%s %s", j.JoinAction, j.TableName) // left join companies
 	where := []string{}
