@@ -6,34 +6,42 @@ import (
 	"github.com/xmdas-link/kitty"
 )
 
+// Config 配置
+type Config struct {
+	Model interface{}
+	Path  string
+	DB    *gorm.DB
+	Ctx   externCtx
+}
+
 // NewWeb 创建对象
-func NewWeb(m interface{}, path string, db *gorm.DB, ctx externCtx) *WebCrud {
-	res := kitty.NewResource(m, path)
-	return &WebCrud{
+func NewWeb(conf *Config) *CRUDWeb {
+	res := kitty.NewResource(conf.Model, conf.Path)
+	return &CRUDWeb{
 		Resource: res,
 		Crud: &kitty.LocalCrud{
 			Model: res.ModelName,
-			DB:    db,
+			DB:    conf.DB,
 		},
-		Ctx: ctx,
+		Ctx: conf.Ctx,
 	}
 }
 
 type crudAction func() (interface{}, error)
 
-// WebCrud web接口
-type WebCrud struct {
+// CRUDWeb web接口
+type CRUDWeb struct {
 	Resource *kitty.Resource
 	Crud     kitty.CRUDInterface
 	Ctx      externCtx
 }
 
 // RoutePath 路由名称
-func (web *WebCrud) RoutePath() string {
+func (web *CRUDWeb) RoutePath() string {
 	return web.Resource.RoutePath()
 }
 
-func (web *WebCrud) result(action crudAction, response webResponse) {
+func (web *CRUDWeb) result(action crudAction, response webResponse) {
 	res, err := action()
 	if err != nil {
 		response.fail(err)

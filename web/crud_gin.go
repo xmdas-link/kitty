@@ -8,7 +8,7 @@ import (
 )
 
 // List ...
-func (web *WebCrud) List(c *gin.Context) {
+func (web *CRUDWeb) List(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.CRUD{
@@ -21,7 +21,7 @@ func (web *WebCrud) List(c *gin.Context) {
 }
 
 // One ...
-func (web *WebCrud) One(c *gin.Context) {
+func (web *CRUDWeb) One(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.CRUD{
@@ -34,7 +34,7 @@ func (web *WebCrud) One(c *gin.Context) {
 }
 
 // Update ...
-func (web *WebCrud) Update(c *gin.Context) {
+func (web *CRUDWeb) Update(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.CRUD{
@@ -47,7 +47,7 @@ func (web *WebCrud) Update(c *gin.Context) {
 }
 
 // Create ...
-func (web *WebCrud) Create(c *gin.Context) {
+func (web *CRUDWeb) Create(c *gin.Context) {
 	c.Request.ParseForm()
 
 	if len(c.Request.PostForm) == 0 {

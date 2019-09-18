@@ -8,7 +8,7 @@ import (
 )
 
 // List2 ..
-func (web *WebCrud) List2(w http.ResponseWriter, r *http.Request) {
+func (web *CRUDWeb) List2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	c1 := &kitty.CRUD{
 		Resource: web.Resource,
@@ -20,7 +20,7 @@ func (web *WebCrud) List2(w http.ResponseWriter, r *http.Request) {
 }
 
 // One2 ...
-func (web *WebCrud) One2(w http.ResponseWriter, r *http.Request) {
+func (web *CRUDWeb) One2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	c1 := &kitty.CRUD{
@@ -33,7 +33,7 @@ func (web *WebCrud) One2(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update2 ...
-func (web *WebCrud) Update2(w http.ResponseWriter, r *http.Request) {
+func (web *CRUDWeb) Update2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	c1 := &kitty.CRUD{
@@ -46,7 +46,7 @@ func (web *WebCrud) Update2(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create2 ...
-func (web *WebCrud) Create2(w http.ResponseWriter, r *http.Request) {
+func (web *CRUDWeb) Create2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	if len(r.PostForm) == 0 {
