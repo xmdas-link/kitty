@@ -9,17 +9,17 @@ import (
 
 //LocalCrud 本地操作
 type LocalCrud struct {
-	Model string
+	Model string // RPC 最终会调用此，所以只能用model作为参数。
 	DB    *gorm.DB
 }
 
 // Do 本地执行db操作
 func (crud *LocalCrud) Do(search *SearchCondition, action string, c context) (interface{}, error) {
-	if err := search.CheckParamValid(crud.Model); err != nil {
-		return nil, err
-	}
+	//	if err := search.CheckParamValid(crud.Model); err != nil {
+	//		return nil, err
+	//	}
 
-	s := NewModelStruct(crud.Model)
+	s := CreateModel(crud.Model)
 	if s == nil {
 		return nil, errors.New("error in create model")
 	}

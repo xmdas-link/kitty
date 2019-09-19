@@ -3,27 +3,22 @@ package kitty
 import (
 	"fmt"
 	"strings"
-
-	"github.com/fatih/structs"
-	"github.com/iancoleman/strcase"
 )
 
 // Resource ....
 type Resource struct {
 	Model     interface{}
-	Prefix    string
-	Path      string
 	ModelName string
-	Strs      *structs.Struct
+	Strs      *Structs
 }
 
 // NewResource ...
-func NewResource(m interface{}, path string) *Resource {
+func NewResource(m interface{}) *Resource {
 	r := &Resource{
 		Model: m,
-		Path:  path,
-		Strs:  structs.New(m),
+		Strs:  createModelStructs(m),
 	}
+	RegisterType(m)
 	r.ModelName = r.Strs.Name()
 	r.checkValid()
 	return r
@@ -34,19 +29,14 @@ func (res *Resource) checkValid() {
 		k := field.Tag("kitty")
 		if strings.Contains(k, "param:") {
 			modelfield := GetSub(k, "param")
-			valid(modelfield)
+			res.valid(modelfield)
 		} else if strings.Contains(k, "bind:") {
 			modelfield := GetSub(k, "bind")
-			if modelfield != "bindresult"{
-				valid(modelfield)
+			if modelfield != "bindresult" {
+				res.valid(modelfield)
 			}
 		}
 	}
-}
-
-// RoutePath 路由
-func (res *Resource) RoutePath() string {
-	return strcase.ToSnake(res.Path)
 }
 
 func test(s *Structs, mf, k string) {
@@ -56,12 +46,12 @@ func test(s *Structs, mf, k string) {
 	}
 }
 
-func valid(modelfield string) {
+func (res *Resource) valid(modelfield string) {
 	v := strings.Split(modelfield, ".")
 	if v[0] == "$" || v[1] == "*" {
 		return
 	}
-	s := NewModelStruct(v[0])
+	s := res.Strs.createModelStructs(v[0])
 	if vv := strings.Split(v[1], ","); len(vv) > 0 {
 		for _, v1 := range vv {
 			test(s, modelfield, v1)

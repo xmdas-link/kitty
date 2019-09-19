@@ -12,7 +12,6 @@ func (web *CRUDWeb) List(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.CRUD{
-		Resource: web.Resource,
 		Form:     c.Request.Form,
 		Crud:     web.Crud,
 		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
@@ -25,7 +24,6 @@ func (web *CRUDWeb) One(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.CRUD{
-		Resource: web.Resource,
 		Form:     c.Request.Form,
 		Crud:     web.Crud,
 		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
@@ -38,7 +36,6 @@ func (web *CRUDWeb) Update(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.CRUD{
-		Resource: web.Resource,
 		Form:     c.Request.PostForm,
 		Crud:     web.Crud,
 		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
@@ -57,7 +54,6 @@ func (web *CRUDWeb) Create(c *gin.Context) {
 	}
 
 	c1 := &kitty.CRUD{
-		Resource: web.Resource,
 		Form:     c.Request.PostForm,
 		Crud:     web.Crud,
 		Ctx:      &ginCtx{c: c, ctx: web.Ctx},

@@ -26,7 +26,7 @@ func (ks *kittys) parse() error {
 		if k := f.Tag("kitty"); len(k) > 0 && !strings.Contains(k, "bind") {
 			if f.Kind() == reflect.Struct {
 				modelName := ToCamel(reflect.TypeOf(f.Value()).Name())
-				kitty := &kitty{}
+				kitty := &kitty{ModelStructs: ks.ModelStructs}
 				kitty.parse(k, modelName, f.Name(), ks.db)
 				ks.kittys = append(ks.kittys, kitty)
 				//if !ks.master().Master {
@@ -39,7 +39,10 @@ func (ks *kittys) parse() error {
 		k := f.Tag("kitty")
 		if strings.Contains(k, "bindresult") {
 			tk := (&FormField{f}).TypeAndKind()
-			ks.result = NewModelStruct(tk.ModelName)
+			ks.result = ks.ModelStructs.createModelStructs(tk.ModelName) //NewModelStruct(tk.ModelName)
+			for k, v := range ks.ModelStructs.strTypes {
+				ks.result.strTypes[k] = v
+			}
 			ks.multiResult = tk.TypeOfField.Kind() == reflect.Slice
 
 			if kkkk := ks.get(tk.ModelName); kkkk != nil {
@@ -59,7 +62,7 @@ func (ks *kittys) parse() error {
 		} else if strings.Contains(k, "bind") {
 			modelField := GetSub(k, "bind")
 			modelName := ToCamel(strings.Split(modelField, ".")[0])
-			kitty := &kitty{}
+			kitty := &kitty{ModelStructs: ks.ModelStructs}
 			binding := kitty.parse(k, modelName, f.Name(), ks.db)
 			ks.binds = append(ks.binds, binding)
 		}

@@ -52,14 +52,15 @@ func (f *fieldBinding) funcName() string { //sum(xx)
 
 // kitty Join字段的约束
 type kitty struct {
-	ModelName  string   // User Company
-	FieldName  string   //
-	TableName  string   // users companies
-	Master     bool     // 主表
-	JoinAction string   // 连接方式 left / right / inner
-	JoinTo     string   // 关联的模型
-	Group      []string // group by a, b  需定义为输出的字段名称。
-	structs    *Structs
+	ModelName    string   // User Company
+	FieldName    string   //
+	TableName    string   // users companies
+	Master       bool     // 主表
+	JoinAction   string   // 连接方式 left / right / inner
+	JoinTo       string   // 关联的模型
+	Group        []string // group by a, b  需定义为输出的字段名称。
+	structs      *Structs
+	ModelStructs *Structs //form structs
 }
 
 // parse kitty:"bind:order_item.*;
@@ -67,7 +68,7 @@ func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding
 	if len(j.TableName) == 0 {
 		j.ModelName = modelName
 		j.FieldName = fieldName
-		j.structs = NewModelStruct(modelName)                                   // OrderItem
+		j.structs = j.ModelStructs.createModelStructs(modelName)                             //NewModelStruct(modelName)                                   // OrderItem
 		j.TableName = db.NewScope(j.structs.raw).GetModelStruct().TableName(db) //order_items
 	}
 

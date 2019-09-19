@@ -7,7 +7,6 @@ import (
 
 // CRUD for web api
 type CRUD struct {
-	Resource *Resource
 	Form     url.Values
 	Crud     CRUDInterface
 	Ctx      context

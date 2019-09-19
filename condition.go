@@ -1,10 +1,5 @@
 package kitty
 
-import (
-	"fmt"
-	"strings"
-)
-
 // SearchCondition ...
 type SearchCondition struct {
 	FormValues  map[string][]string `json:"form_values,omitempty"`
@@ -12,6 +7,7 @@ type SearchCondition struct {
 	ReturnCount int                 `json:"return_count,omitempty"`
 }
 
+/*
 // CheckParamValid ...
 func (s *SearchCondition) CheckParamValid(model string) error {
 	ss := NewModelStruct(model)
@@ -27,3 +23,4 @@ func (s *SearchCondition) CheckParamValid(model string) error {
 	}
 	return nil
 }
+*/

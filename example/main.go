@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/xmdas-link/kitty"
 	"github.com/xmdas-link/kitty/example/model"
 	"github.com/xmdas-link/kitty/web"
 )
@@ -37,23 +38,51 @@ func main() {
 }
 
 func FormCreateUser(r *gin.RouterGroup) {
-	web := web.NewWeb(&model.FormCreateUser{}, "user", DB, &currentCtx{})
-	r.POST(web.RoutePath()+"/create", web.Create)
+	res := kitty.NewResource(&model.FormCreateUser{})
+	web := web.NewWeb(&web.Config{
+		Crud: &kitty.LocalCrud{
+			Model: res.ModelName,
+			DB:    DB,
+		},
+		Ctx: &currentCtx{},
+	})
+	r.POST("user/create", web.Create)
 }
 
 func FormUpdateUser(r *gin.RouterGroup) {
-	web := web.NewWeb(&model.FormUpdateUser{}, "user", DB, &currentCtx{})
-	r.POST(web.RoutePath()+"/update", web.Update)
+	res := kitty.NewResource(&model.FormUpdateUser{})
+	web := web.NewWeb(&web.Config{
+		Crud: &kitty.LocalCrud{
+			Model: res.ModelName,
+			DB:    DB,
+		},
+		Ctx: &currentCtx{},
+	})
+	r.POST("user/update", web.Update)
 }
 
 func FormUser(r *gin.RouterGroup) {
-	web := web.NewWeb(&model.FormUser{}, "user", DB, &currentCtx{})
-	r.GET(web.RoutePath()+"/one", web.One)
+	res := kitty.NewResource(&model.FormUser{})
+	web := web.NewWeb(&web.Config{
+		Crud: &kitty.LocalCrud{
+			Model: res.ModelName,
+			DB:    DB,
+		},
+		Ctx: &currentCtx{},
+	})
+	r.GET("user/one", web.One)
 }
 
 func FormUserList(r *gin.RouterGroup) {
-	web := web.NewWeb(&model.FormUserList{}, "user", DB, &currentCtx{})
-	r.GET(web.RoutePath()+"/list", web.List)
+	res := kitty.NewResource(&model.FormUserList{})
+	web := web.NewWeb(&web.Config{
+		Crud: &kitty.LocalCrud{
+			Model: res.ModelName,
+			DB:    DB,
+		},
+		Ctx: &currentCtx{},
+	})
+	r.GET("user/list", web.List)
 }
 
 type currentCtx struct {

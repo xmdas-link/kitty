@@ -76,7 +76,7 @@ func (e *expr) init() {
 		key := ToCamel(v[2])
 		value := ToCamel(v[3])
 
-		ss := NewModelStruct(model)
+		ss := s.createModelStructs(model) //NewModelStruct(model)
 		keyField := ss.Field(key)
 		values := s.Field(value).Value()
 
@@ -110,7 +110,7 @@ func (e *expr) init() {
 		valueField := ToCamel(v[1])
 
 		model := (&FormField{e.f}).TypeAndKind().ModelName
-		ss := NewModelStruct(model)
+		ss := s.createModelStructs(model) //NewModelStruct(model)
 
 		if db.Where(fmt.Sprintf("%s = ?", keyField), s.Field(valueField).Value()).First(ss.raw).Error == nil {
 			e.f.Set(ss.raw)
@@ -162,7 +162,7 @@ func (e *expr) init() {
 			}
 		}
 
-		ss := NewModelStruct(model)
+		ss := s.createModelStructs(model) //NewModelStruct(model)
 
 		if tk.TypeOfField.Kind() == reflect.Struct {
 			if tx.First(ss.raw).Error == nil {

@@ -61,13 +61,13 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) er
 				len := rv.Len()
 				for i := 0; i < len; i++ {
 					rvdata := rv.Index(i)
-					sdata := NewStr(rvdata.Interface())
+					sdata := createModelStructs(rvdata.Interface())
 					if err := setter(sdata, param, db, c); err != nil {
 						return err
 					}
 				}
 			} else if tk.TypeOfField.Kind() == reflect.Struct {
-				sdata := NewStr(f.Value())
+				sdata := createModelStructs(f.Value())
 				if err := setter(sdata, param, db, c); err != nil {
 					return err
 				}
@@ -78,7 +78,8 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) er
 				a := strings.LastIndex(setter, "(")
 				b := strings.Index(setter, ".")
 				model := setter[a+1 : b]
-				res, err := queryObj(NewModelStruct(model), &SearchCondition{}, db, c)
+				//res, err := queryObj(NewModelStruct(model), &SearchCondition{}, db, c)
+				res, err := queryObj(s.createModelStructs(model), &SearchCondition{}, db, c)
 				if err != nil {
 					return err
 				}
