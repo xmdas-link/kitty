@@ -38,49 +38,37 @@ func main() {
 }
 
 func FormCreateUser(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormCreateUser{})
-	web := web.NewWeb(&web.Config{
-		Crud: &kitty.LocalCrud{
-			Model: res.ModelName,
-			DB:    DB,
-		},
-		Ctx: &currentCtx{},
+	web := web.NewLocalWeb(&web.Config{
+		Model: &model.FormCreateUser{},
+		DB:    DB,
+		Ctx:   &currentCtx{},
 	})
 	r.POST("user/create", web.Create)
 }
 
 func FormUpdateUser(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormUpdateUser{})
-	web := web.NewWeb(&web.Config{
-		Crud: &kitty.LocalCrud{
-			Model: res.ModelName,
-			DB:    DB,
-		},
-		Ctx: &currentCtx{},
+	web := web.NewLocalWeb(&web.Config{
+		Model: &model.FormUpdateUser{},
+		DB:    DB,
+		Ctx:   &currentCtx{},
 	})
 	r.POST("user/update", web.Update)
 }
 
 func FormUser(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormUser{})
-	web := web.NewWeb(&web.Config{
-		Crud: &kitty.LocalCrud{
-			Model: res.ModelName,
-			DB:    DB,
-		},
-		Ctx: &currentCtx{},
+	web := web.NewLocalWeb(&web.Config{
+		Model: &model.FormUser{},
+		DB:    DB,
+		Ctx:   &currentCtx{},
 	})
 	r.GET("user/one", web.One)
 }
 
 func FormUserList(r *gin.RouterGroup) {
-	res := kitty.NewResource(&model.FormUserList{})
-	web := web.NewWeb(&web.Config{
-		Crud: &kitty.LocalCrud{
-			Model: res.ModelName,
-			DB:    DB,
-		},
-		Ctx: &currentCtx{},
+	web := web.NewLocalWeb(&web.Config{
+		Model: &model.FormUserList{},
+		DB:    DB,
+		Ctx:   &currentCtx{},
 	})
 	r.GET("user/list", web.List)
 }

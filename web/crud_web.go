@@ -2,20 +2,39 @@ package web
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"
 	"github.com/xmdas-link/kitty"
 )
 
 // Config 配置
 type Config struct {
-	Ctx      externCtx
-	Crud     kitty.CRUDInterface
+	Model interface{}
+	Ctx   externCtx
+	DB    *gorm.DB
+	RPC   kitty.RPC
 }
 
-// NewWeb 创建对象
-func NewWeb(conf *Config) *CRUDWeb {
+// NewLocalWeb ..
+func NewLocalWeb(conf *Config) *CRUDWeb {
+	res := kitty.NewResource(conf.Model)
 	return &CRUDWeb{
-		Crud:     conf.Crud,
-		Ctx:      conf.Ctx,
+		Crud: &kitty.LocalCrud{
+			Model: res.ModelName,
+			DB:    conf.DB,
+		},
+		Ctx: conf.Ctx,
+	}
+}
+
+// NewRPCWeb .
+func NewRPCWeb(conf *Config) *CRUDWeb {
+	res := kitty.NewResource(conf.Model)
+	return &CRUDWeb{
+		Crud: &kitty.RPCCrud{
+			Model: res.ModelName,
+			RPC:   conf.RPC,
+		},
+		Ctx: conf.Ctx,
 	}
 }
 
@@ -23,8 +42,8 @@ type crudAction func() (interface{}, error)
 
 // CRUDWeb web接口
 type CRUDWeb struct {
-	Crud     kitty.CRUDInterface
-	Ctx      externCtx
+	Crud kitty.CRUDInterface
+	Ctx  externCtx
 }
 
 func (web *CRUDWeb) result(action crudAction, response webResponse) {
