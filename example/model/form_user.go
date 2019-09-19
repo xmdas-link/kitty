@@ -3,11 +3,12 @@ package model
 // FormCreateUser 创建User，表单参数定义Name Age Department
 // 参数校验： 1. 名称不能为空  2. 名称不能重复 (通过定义字段User)
 type FormCreateUser struct {
-	Name               *string `json:"-" kitty:"param:user.name;" vd:"len($)>0;msg:'name required'"`
-	Age                *string `json:"-" kitty:"param:user.age;"`
-	Department         *string `json:"-" kitty:"param:user.department;"`
-	TestNameDumplicate *User   `json:"-" kitty:"getter:rd('name.name')" vd:"$==nil;msg:'name duplicate'"`
-	User               User    `json:"-" kitty:"master"`
+	Name               *string  `json:"-" kitty:"param:user.name;" vd:"len($)>0;msg:'name required'"`
+	Age                *string  `json:"-" kitty:"param:user.age;"`
+	Department         *string  `json:"-" kitty:"param:user.department;"`
+	Salary             *float64 `json:"-" kitty:"param:user.salary;" vd:"$>0.0;msg:'salary is zero.'"`
+	TestNameDumplicate *User    `json:"-" kitty:"getter:rd('name.name')" vd:"$==nil;msg:'name duplicate'"`
+	User               User     `json:"-" kitty:"master"`
 }
 
 // FormUpdateUser 更新user.

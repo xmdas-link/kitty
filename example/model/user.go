@@ -9,5 +9,5 @@ type User struct {
 	Name       string `gorm:"UNIQUE_INDEX"`
 	Age        int
 	Department string
+	Salary     float64
 }
-

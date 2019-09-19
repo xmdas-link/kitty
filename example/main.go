@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/xmdas-link/kitty"
 	"github.com/xmdas-link/kitty/example/model"
 	"github.com/xmdas-link/kitty/web"
 )

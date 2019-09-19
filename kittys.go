@@ -121,7 +121,7 @@ func (ks *kittys) where() []*fieldQryFormat {
 			continue
 		}
 		if q := ks.ModelStructs.buildFormFieldQuery(bind.FieldName); q != nil {
-			q.field = bind.funcName()
+			q.field = bind.funcName() + " " + q.field
 			s = append(s, q)
 		}
 	}
