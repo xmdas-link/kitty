@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/jinzhu/gorm"
 

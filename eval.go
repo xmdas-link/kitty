@@ -79,7 +79,7 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) er
 				b := strings.Index(setter, ".")
 				model := setter[a+1 : b]
 				//res, err := queryObj(NewModelStruct(model), &SearchCondition{}, db, c)
-				res, err := queryObj(s.createModelStructs(model), &SearchCondition{}, db, c)
+				res, err := queryObj(CreateModel(model), &SearchCondition{}, db, c)
 				if err != nil {
 					return err
 				}

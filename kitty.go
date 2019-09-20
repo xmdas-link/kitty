@@ -68,7 +68,7 @@ func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding
 	if len(j.TableName) == 0 {
 		j.ModelName = modelName
 		j.FieldName = fieldName
-		j.structs = j.ModelStructs.createModelStructs(modelName)                             //NewModelStruct(modelName)                                   // OrderItem
+		j.structs = CreateModel(modelName)                             //NewModelStruct(modelName)                                   // OrderItem
 		j.TableName = db.NewScope(j.structs.raw).GetModelStruct().TableName(db) //order_items
 	}
 

@@ -39,10 +39,7 @@ func (ks *kittys) parse() error {
 		k := f.Tag("kitty")
 		if strings.Contains(k, "bindresult") {
 			tk := (&FormField{f}).TypeAndKind()
-			ks.result = ks.ModelStructs.createModelStructs(tk.ModelName) //NewModelStruct(tk.ModelName)
-			for k, v := range ks.ModelStructs.strTypes {
-				ks.result.strTypes[k] = v
-			}
+			ks.result = CreateModel(tk.ModelName) //NewModelStruct(tk.ModelName)
 			ks.multiResult = tk.TypeOfField.Kind() == reflect.Slice
 
 			if kkkk := ks.get(tk.ModelName); kkkk != nil {

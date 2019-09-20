@@ -2,11 +2,14 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/json-iterator/go"
 
 	"github.com/xmdas-link/kitty"
 	kittyrpc "github.com/xmdas-link/kitty/rpc/proto/kittyrpc"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // KittyClientRPC kitty for rpc
 type KittyClientRPC struct {

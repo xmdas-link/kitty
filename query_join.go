@@ -29,7 +29,9 @@ func (q *joinQuery) prepare() *gorm.DB {
 		tx = tx.Where(v.field, v.v...)
 	}
 	//for _, v := range q.GroupBy {
-	tx = tx.Group(strings.Join(q.GroupBy, ", "))
+	if len(q.GroupBy) > 0 {
+		tx = tx.Group(strings.Join(q.GroupBy, ", "))
+	}
 	//}
 	if q.Having != nil {
 		tx = tx.Having(q.Having.field, q.Having.v...)

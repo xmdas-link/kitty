@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/iancoleman/strcase"
-	"github.com/modern-go/reflect2"
 
 	"github.com/fatih/structs"
 )
@@ -17,8 +16,8 @@ import (
 // Structs .
 type Structs struct {
 	*structs.Struct
-	raw      interface{}
-	strTypes map[string]reflect2.Type
+	raw interface{}
+	//strTypes map[string]reflect2.Type
 }
 
 // FieldTypeAndKind 字段类型，模型名称
@@ -43,39 +42,7 @@ type fieldQryFormat struct {
 
 // createModelStructs ...
 func createModelStructs(v interface{}) *Structs {
-	s := &Structs{structs.New(v), v, make(map[string]reflect2.Type)}
-	typ := reflect2.TypeOf(v)
-	structType := (typ.(*reflect2.UnsafePtrType)).Elem().(*reflect2.UnsafeStructType)
-	for i := 0; i < structType.NumField(); i++ {
-		field := structType.Field(i)
-		type2 := field.Type()
-		nativeType := DereferenceType(type2.Type1())
-		if nativeType.Kind() == reflect.Slice {
-			nativeType = nativeType.Elem()
-			t1 := type2.(reflect2.SliceType).Elem()
-			if t1.Kind() == reflect.Ptr {
-				type2 = t1.(*reflect2.UnsafePtrType).Elem()
-			}
-		}
-		if nativeType.Kind() == reflect.Ptr {
-			nativeType = nativeType.Elem()
-		}
-		if nativeType.Kind() == reflect.Struct {
-			s.strTypes[strcase.ToSnake(nativeType.Name())] = type2
-		}
-	}
-	return s
-}
-
-func (s *Structs) createObj(name string) interface{} {
-	if v := s.strTypes[strcase.ToSnake(name)]; v != nil {
-		return v.New()
-	}
-	panic("")
-}
-
-func (s *Structs) createModelStructs(name string) *Structs {
-	return createModelStructs(s.createObj(name))
+	return &Structs{structs.New(v), v}
 }
 
 // CallMethod .
@@ -232,7 +199,7 @@ func (s *Structs) GetStructFieldInfo(fieldname string) (fi StructFieldInfo, err 
 			if testNewForeignKey {
 				fi.ForeignKey = s.Name() + "ID" // with has one...
 			}
-			ss := s.createModelStructs(fi.TypeKind.ModelName) //NewModelStruct(fi.TypeKind.ModelName)
+			ss := CreateModel(fi.TypeKind.ModelName) //NewModelStruct(fi.TypeKind.ModelName)
 			if _, ok := ss.FieldOk(fi.ForeignKey); ok {
 				if fi.TypeKind.KindOfField == reflect.Struct {
 					fi.Relationship = "has_one"
@@ -248,7 +215,6 @@ func (s *Structs) GetStructFieldInfo(fieldname string) (fi StructFieldInfo, err 
 	return fi, nil
 }
 
-/*
 // FillStructField fieldname must struct
 func (s *Structs) FillStructField(fieldname string, values map[string][]interface{}) error {
 	fi, err := s.GetStructFieldInfo(fieldname)
@@ -258,7 +224,7 @@ func (s *Structs) FillStructField(fieldname string, values map[string][]interfac
 	}
 
 	field := s.Field(fieldname)
-	ss := NewModelStruct(fi.TypeKind.ModelName)
+	ss := CreateModel(fi.TypeKind.ModelName)
 
 	var objVaule interface{}
 	if fi.TypeKind.KindOfField == reflect.Struct {
@@ -299,7 +265,7 @@ func (s *Structs) FillStructField(fieldname string, values map[string][]interfac
 	return field.Set(vObj.Interface())
 
 }
-*/
+
 // GetRelationsWithModel fieldname (elem) must struct -> email = user
 func (s *Structs) GetRelationsWithModel(fieldname string, modelName string) (fi StructFieldInfo, err error) {
 
@@ -328,7 +294,7 @@ func (s *Structs) GetRelationsWithModel(fieldname string, modelName string) (fi 
 		}
 
 		if testNewForeignKey {
-			ss := s.createModelStructs(modelName) //NewModelStruct(modelName)
+			ss := CreateModel(modelName) //NewModelStruct(modelName)
 			if _, ok := ss.FieldOk(fi.AssociationForeignkey); ok {
 				fi.Relationship = "has_one"
 			} else {
@@ -434,7 +400,7 @@ func (s *Structs) nameAs(names map[string][]string) {
 				if strings.Contains(k, fmt.Sprintf("bind:%s", strcase.ToSnake(typeKind.ModelName))) {
 					f1(typeKind, k, names)
 				} else {
-					ss := s.createModelStructs(typeKind.ModelName) //NewModelStruct(typeKind.ModelName)
+					ss := CreateModel(typeKind.ModelName) //NewModelStruct(typeKind.ModelName)
 					ss.nameAs(names)
 				}
 

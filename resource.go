@@ -51,7 +51,7 @@ func (res *Resource) valid(modelfield string) {
 	if v[0] == "$" || v[1] == "*" {
 		return
 	}
-	s := res.Strs.createModelStructs(v[0])
+	s := CreateModel(v[0])
 	if vv := strings.Split(v[1], ","); len(vv) > 0 {
 		for _, v1 := range vv {
 			test(s, modelfield, v1)
