@@ -11,10 +11,12 @@ import (
 
 //KittyRPCService ...
 type KittyRPCService struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	Callbk kitty.SuccessCallback
+	Ctx    kitty.Context
 }
 
-// Handler rpc call handle
+// Call rpc call handle
 func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp *kittyrpc.Response) error {
 
 	var (
@@ -30,11 +32,12 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 	}
 
 	crud := &kitty.LocalCrud{
-		Model: req.Model,
-		DB:    rpc.DB,
+		Model:  req.Model,
+		DB:     rpc.DB,
+		Callbk: rpc.Callbk,
 	}
 
-	if res, err = crud.Do(&search, req.Action, nil); err == nil && res != nil {
+	if res, err = crud.Do(&search, req.Action, rpc.Ctx); err == nil && res != nil {
 		if jsonbytes, err = json.Marshal(res); err == nil {
 			rsp.Msg = string(jsonbytes)
 			return nil

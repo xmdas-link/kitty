@@ -9,17 +9,18 @@ import (
 
 //LocalCrud 本地操作
 type LocalCrud struct {
-	Model string // RPC 最终会调用此，所以只能用model作为参数。
-	DB    *gorm.DB
+	Model  string // RPC 最终会调用此，所以只能用model作为参数。
+	DB     *gorm.DB
+	Callbk SuccessCallback
 }
 
 // Do 本地执行db操作
-func (crud *LocalCrud) Do(search *SearchCondition, action string, c context) (interface{}, error) {
+func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (interface{}, error) {
 	//	if err := search.CheckParamValid(crud.Model); err != nil {
 	//		return nil, err
 	//	}
 
-	s := CreateModel(crud.Model)
+	s := CreateModel(local.Model)
 	if s == nil {
 		return nil, errors.New("error in create model")
 	}
@@ -31,14 +32,21 @@ func (crud *LocalCrud) Do(search *SearchCondition, action string, c context) (in
 		res interface{}
 		err error
 	)
+	crud := newcrud(&config{
+		strs:   s,
+		search: search,
+		db:     local.DB,
+		ctx:    c,
+		callbk: local.Callbk,
+	})
 
 	switch action {
 	case "C":
-		res, err = createObj(s, search, crud.DB, c)
+		res, err = crud.createObj()
 	case "R":
-		res, err = queryObj(s, search, crud.DB, c)
+		res, err = crud.queryObj()
 	case "U":
-		err = updateObj(s, search, crud.DB, c)
+		err = crud.updateObj()
 	default:
 		return nil, errors.New("unknown model action")
 	}

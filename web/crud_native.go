@@ -10,7 +10,7 @@ import (
 // List2 ..
 func (web *CRUDWeb) List2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	c1 := &kitty.CRUD{
+	c1 := &kitty.API{
 		Form:     r.Form,
 		Crud:     web.Crud,
 		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
@@ -22,7 +22,7 @@ func (web *CRUDWeb) List2(w http.ResponseWriter, r *http.Request) {
 func (web *CRUDWeb) One2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
-	c1 := &kitty.CRUD{
+	c1 := &kitty.API{
 		Form:     r.Form,
 		Crud:     web.Crud,
 		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
@@ -34,7 +34,7 @@ func (web *CRUDWeb) One2(w http.ResponseWriter, r *http.Request) {
 func (web *CRUDWeb) Update2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
-	c1 := &kitty.CRUD{
+	c1 := &kitty.API{
 		Form:     r.PostForm,
 		Crud:     web.Crud,
 		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
@@ -52,7 +52,7 @@ func (web *CRUDWeb) Create2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c1 := &kitty.CRUD{
+	c1 := &kitty.API{
 		Form:     r.PostForm,
 		Crud:     web.Crud,
 		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},

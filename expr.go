@@ -18,7 +18,7 @@ type expr struct {
 	f         *structs.Field
 	functions map[string]govaluate.ExpressionFunction
 	params    map[string]interface{}
-	ctx       context
+	ctx       Context
 }
 
 func (e *expr) init() {

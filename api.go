@@ -5,15 +5,15 @@ import (
 	"strconv"
 )
 
-// CRUD for web api
-type CRUD struct {
+// API for web api
+type API struct {
 	Form     url.Values
 	Crud     CRUDInterface
-	Ctx      context
+	Ctx      Context
 }
 
 // List 。
-func (c *CRUD) List() (interface{}, error) {
+func (c *API) List() (interface{}, error) {
 	Page := &Page{}
 	if page := c.Form["page"]; len(page) > 0 {
 		p, _ := strconv.ParseUint(page[0], 10, 64)
@@ -34,19 +34,19 @@ func (c *CRUD) List() (interface{}, error) {
 }
 
 // One 单条记录
-func (c *CRUD) One() (interface{}, error) {
+func (c *API) One() (interface{}, error) {
 	s := &SearchCondition{FormValues: c.Form}
 	return c.Crud.Do(s, "R", c.Ctx)
 }
 
 // Update ...
-func (c *CRUD) Update() (interface{}, error) {
+func (c *API) Update() (interface{}, error) {
 	s := &SearchCondition{FormValues: c.Form}
 	return c.Crud.Do(s, "U", c.Ctx)
 }
 
 // Create ...
-func (c *CRUD) Create() (interface{}, error) {
+func (c *API) Create() (interface{}, error) {
 	s := &SearchCondition{FormValues: c.Form}
 	return c.Crud.Do(s, "C", c.Ctx)
 }

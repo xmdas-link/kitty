@@ -17,7 +17,7 @@ type update interface {
 	update() error
 }
 
-func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) error {
+func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,
@@ -42,7 +42,7 @@ func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) er
 	return nil
 }
 
-func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c context) error {
+func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,

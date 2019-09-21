@@ -8,10 +8,11 @@ import (
 
 // Config 配置
 type Config struct {
-	Model interface{}
-	Ctx   externCtx
-	DB    *gorm.DB
-	RPC   kitty.RPC
+	Model  interface{}
+	Ctx    externCtx
+	DB     *gorm.DB
+	RPC    kitty.RPC
+	Callbk kitty.SuccessCallback
 }
 
 // NewLocalWeb ..
@@ -19,8 +20,9 @@ func NewLocalWeb(conf *Config) *CRUDWeb {
 	res := kitty.NewResource(conf.Model)
 	return &CRUDWeb{
 		Crud: &kitty.LocalCrud{
-			Model: res.ModelName,
-			DB:    conf.DB,
+			Model:  res.ModelName,
+			DB:     conf.DB,
+			Callbk: conf.Callbk,
 		},
 		Ctx: conf.Ctx,
 	}

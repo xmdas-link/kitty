@@ -11,7 +11,27 @@ import (
 
 //CRUDInterface ...
 type CRUDInterface interface {
-	Do(search *SearchCondition, action string, c context) (interface{}, error)
+	Do(*SearchCondition, string, Context) (interface{}, error)
+}
+
+// SuccessCallback 执行成功后，回调。返回error后，回滚事务
+type SuccessCallback func(*Structs, *gorm.DB) error
+
+// CRUD配置
+type config struct {
+	strs   *Structs         //模型结构
+	search *SearchCondition //查询条件
+	db     *gorm.DB         //db
+	ctx    Context          //上下文
+	callbk SuccessCallback  //成功回调
+}
+
+type crud struct {
+	*config
+}
+
+func newcrud(conf *config) *crud {
+	return &crud{conf}
 }
 
 func init() {
@@ -31,7 +51,14 @@ func init() {
 	}, true)
 }
 
-func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) (interface{}, error) {
+func (crud *crud) queryObj() (interface{}, error) {
+	var (
+		s      = crud.strs
+		search = crud.search
+		db     = crud.db
+		c      = crud.ctx
+		callbk = crud.callbk
+	)
 	getter(s, make(map[string]interface{}), db, c)
 
 	if err := vd.Validate(s.raw); err != nil {
@@ -68,12 +95,23 @@ func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) (inte
 	if err = setter(s, params, db, c); err != nil {
 		return nil, err
 	}
+
+	if err = callbk(s, db); err != nil {
+		return nil, err
+	}
+
 	return s.raw, nil
 }
 
 // CreateObj ...
-func createObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) (interface{}, error) {
-
+func (crud *crud) createObj() (interface{}, error) {
+	var (
+		s      = crud.strs
+		search = crud.search
+		db     = crud.db
+		c      = crud.ctx
+		callbk = crud.callbk
+	)
 	getter(s, make(map[string]interface{}), db, c)
 
 	if err := vd.Validate(s.raw); err != nil {
@@ -116,11 +154,22 @@ func createObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) (int
 		tx.Rollback()
 		return nil, err
 	}
+	if err = callbk(s, db); err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
 	return res, tx.Commit().Error
 }
 
-func updateObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) error {
-
+func (crud *crud) updateObj() error {
+	var (
+		s      = crud.strs
+		search = crud.search
+		db     = crud.db
+		c      = crud.ctx
+		callbk = crud.callbk
+	)
 	getter(s, make(map[string]interface{}), db, c)
 
 	if _, ok := s.FieldOk("ID"); ok {
@@ -171,5 +220,22 @@ func updateObj(s *Structs, search *SearchCondition, db *gorm.DB, c context) erro
 		tx.Rollback()
 		return err
 	}
+
+	if err := callbk(s, db); err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	return tx.Commit().Error
+}
+
+//
+func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c Context) (interface{}, error) {
+	crud := newcrud(&config{
+		strs:   s,
+		search: search,
+		db:     db,
+		ctx:    c,
+	})
+	return crud.queryObj()
 }
