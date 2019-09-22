@@ -4,8 +4,10 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/Knetic/govaluate"
+	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/iancoleman/strcase"
 	"github.com/jinzhu/gorm"
 )
@@ -126,6 +128,22 @@ var (
 
 func init() {
 	exprFuncs = make(map[string]govaluate.ExpressionFunction)
+
+	vd.RegFunc("time", func(args ...interface{}) bool {
+		if len(args) != 1 {
+			return false
+		}
+		s, ok := args[0].(string)
+		if !ok {
+			return false
+		}
+		_, err := time.ParseInLocation("2006-01-02 15:04:05", s, time.Local)
+		if err != nil {
+			return false
+		}
+		return true
+	}, true)
+
 }
 
 // RegisterFunc ...
