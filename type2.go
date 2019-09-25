@@ -16,30 +16,38 @@ func RegisterType(v interface{}) {
 		types = make(map[string]reflect2.Type)
 	}
 	s := &Structs{structs.New(v), v}
+	if _, hasRegister := types[strcase.ToSnake(s.Name())]; hasRegister {
+		return
+	}
 	types[strcase.ToSnake(s.Name())] = reflect2.TypeOf(v).(*reflect2.UnsafePtrType).Elem()
+
+	var registerStructType = func(field reflect2.Type) {
+		nativeType := DereferenceType(field.Type1())
+		types[strcase.ToSnake(nativeType.Name())] = field
+		RegisterType(field.New())
+	}
 
 	typ := reflect2.TypeOf(v)
 	structType := (typ.(*reflect2.UnsafePtrType)).Elem().(*reflect2.UnsafeStructType)
 	for i := 0; i < structType.NumField(); i++ {
 		field := structType.Field(i)
-		type2 := field.Type()
-		nativeType := DereferenceType(type2.Type1())
-		if nativeType.Kind() == reflect.Slice {
-			nativeType = nativeType.Elem()
-			t1 := type2.(reflect2.SliceType).Elem()
-			if t1.Kind() == reflect.Ptr {
-				type2 = t1.(*reflect2.UnsafePtrType).Elem()
+		if field.Type().Kind() == reflect.Struct {
+			registerStructType(field.Type())
+		} else if field.Type().Kind() == reflect.Ptr {
+			ptrType := field.Type().(*reflect2.UnsafePtrType)
+			if ptrType.Elem().Kind() == reflect.Struct {
+				registerStructType(ptrType.Elem())
 			}
-		}
-		if nativeType.Kind() == reflect.Ptr {
-			nativeType = nativeType.Elem()
-		}
+		} else if field.Type().Kind() == reflect.Slice {
+			sliceType := field.Type().(*reflect2.UnsafeSliceType)
+			elemType := sliceType.Elem()
+			if elemType.Kind() == reflect.Ptr {
+				elemType = elemType.(*reflect2.UnsafePtrType).Elem()
+			}
+			if elemType.Kind() == reflect.Struct {
+				registerStructType(elemType)
+			}
 
-		if nativeType.Kind() == reflect.Struct {
-			if v, ok := type2.(*reflect2.UnsafePtrType); ok {
-				type2 = v.Elem()
-			}
-			types[strcase.ToSnake(nativeType.Name())] = type2
 		}
 	}
 }
