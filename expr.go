@@ -1,8 +1,10 @@
 package kitty
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/fatih/structs"
@@ -52,6 +54,12 @@ func (e *expr) init() {
 
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
 		field := args[0].(string)
+		if strings.Contains(field, ".") { //xxx.xx
+			v := strings.Split(field, ".")
+			field = ToCamel(v[0])
+			value := e.s.Field(field).Field(ToCamel(v[1])).Value()
+			return value, nil
+		}
 		if f, ok := e.s.FieldOk(ToCamel(field)); ok {
 			if !reflect.ValueOf(f.Value()).IsNil() {
 				return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
@@ -178,6 +186,149 @@ func (e *expr) init() {
 
 		return nil, nil
 	}
+
+	functions["batch_create"] = func(args ...interface{}) (interface{}, error) {
+		s := e.s
+
+		if len(args) > 0 {
+			modelNameForCreate := strcase.ToSnake(e.f.Name())
+			count, _ := strconv.ParseInt(args[0].(string), 10, 64)
+			slices := make([]*Structs, 0)
+			for i := 0; i < int(count); i++ {
+				screate := CreateModel(modelNameForCreate)
+				slices = append(slices, screate)
+			}
+
+			for _, field := range s.Fields() {
+				k := field.Tag("kitty")
+				if len(k) > 0 && strings.Contains(k, fmt.Sprintf("param:%s", modelNameForCreate)) {
+					tk := (&FormField{field}).TypeAndKind()
+					if tk.KindOfField == reflect.Slice { // []*Strcuts []*int
+						datavalue := field.Value() // slice
+						dslice := reflect.ValueOf(datavalue)
+						elemType := DereferenceType(tk.TypeOfField.Elem())
+						if elemType.Kind() == reflect.Struct {
+							for i := 0; i < dslice.Len(); i++ {
+								screate := slices[i]
+								dv := dslice.Index(i)
+								ss := createModelStructs(dv.Interface())
+								for _, field := range ss.Fields() {
+									fname := field.Name()
+									if f, ok := screate.FieldOk(fname); ok {
+										screate.SetFieldValue(f, field.Value())
+									}
+								}
+							}
+						} else {
+							bindField := strings.Split(GetSub(k, "param"), ".")[1]
+							for i := 0; i < len(slices); i++ {
+								screate := slices[i]
+								f := screate.Field(ToCamel(bindField))
+								screate.SetFieldValue(f, field.Value())
+							}
+						}
+					} else if tk.KindOfField == reflect.Struct {
+						for i := 0; i < len(slices); i++ {
+							screate := slices[i]
+							for _, subfield := range field.Fields() {
+								fname := subfield.Name()
+								if f, ok := screate.FieldOk(fname); ok {
+									screate.SetFieldValue(f, field.Value())
+								}
+							}
+						}
+					} else {
+						for i := 0; i < len(slices); i++ {
+							screate := slices[i]
+							f := screate.Field(field.Name())
+							if err := screate.SetFieldValue(f, field.Value()); err != nil {
+								return nil, err
+							}
+						}
+					}
+				}
+			}
+
+			for i := 0; i < len(slices); i++ {
+				screate := slices[i]
+				crud := newcrud(&config{
+					strs:   screate,
+					search: &SearchCondition{},
+					db:     e.db,
+					ctx:    e.ctx,
+				})
+				if _, err := crud.createObj(); err != nil {
+					return nil, err
+				}
+			}
+			return nil, nil
+		}
+
+		return nil, errors.New("param error in batch_create")
+	}
+
+	var f1 = func(model string, args ...interface{}) (*Structs, error) {
+		strs := CreateModel(model)
+
+		params := strings.Split(args[0].(string), ",")
+		for _, v := range params {
+			param := strings.Split(v, "=") //like id=id_list ; id=1 ; count=10
+			field := strs.Field(ToCamel(param[0]))
+			if f, ok := e.s.FieldOk(ToCamel(param[1])); ok {
+				if err := field.Set(f.Value()); err != nil {
+					return nil, err
+				}
+			} else {
+				if err := strs.SetFieldValue(field, param[1]); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return strs, nil
+	}
+
+	functions["qry"] = func(args ...interface{}) (interface{}, error) {
+		strs, err := f1(e.f.Name(), args[0:])
+		if err != nil {
+			return nil, err
+		}
+
+		return newcrud(&config{
+			strs:   strs,
+			search: &SearchCondition{},
+			db:     e.db,
+			ctx:    e.ctx,
+		}).queryObj()
+	}
+
+	functions["create"] = func(args ...interface{}) (interface{}, error) {
+		strs, err := f1(e.f.Name(), args[0:])
+		if err != nil {
+			return nil, err
+		}
+
+		return newcrud(&config{
+			strs:   strs,
+			search: &SearchCondition{},
+			db:     e.db,
+			ctx:    e.ctx,
+		}).createObj()
+	}
+
+	functions["update"] = func(args ...interface{}) (interface{}, error) {
+		strs, err := f1(e.f.Name(), args[0:])
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, newcrud(&config{
+			strs:   strs,
+			search: &SearchCondition{},
+			db:     e.db,
+			ctx:    e.ctx,
+		}).updateObj()
+	}
+
 }
 
 func (e *expr) eval(expString string) (interface{}, error) {

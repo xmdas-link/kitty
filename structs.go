@@ -70,12 +70,27 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 	FT := DereferenceType(RealType)
 	FK = FT.Kind()
 
+	/*
+		if FK == reflect.Struct || FK == reflect.Slice || FK == reflect.Map {
+			default:
+				if RealType.Kind() != reflect.Ptr {
+					return f.Set(rv.Interface())
+				}
+				return f.Set(ptr(rv).Interface())
+			}
+		}*/
+
 	// 同一类型 ， 暂不在支持 map，结构体，切片
-	if VK == FK && FK != reflect.Struct && FK != reflect.Map && FK != reflect.Slice {
-		if RealType.Kind() != reflect.Ptr {
-			return f.Set(rv.Interface())
+	if VK == FK {
+		switch f.Value().(type) {
+		case time.Time:
+			//do nothing
+		default:
+			if RealType.Kind() != reflect.Ptr {
+				return f.Set(rv.Interface())
+			}
+			return f.Set(ptr(rv).Interface())
 		}
-		return f.Set(ptr(rv).Interface())
 	}
 	var x interface{}
 

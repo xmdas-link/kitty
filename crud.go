@@ -138,6 +138,16 @@ func (crud *crud) createObj() (interface{}, error) {
 		tx.Rollback()
 		return nil, err
 	}
+	for _, v := range kittys.kittys {
+		f := s.Field(v.FieldName)
+		s.SetFieldValue(f, v.structs.raw)
+	}
+	params := make(map[string]interface{})
+	params["ms"] = s
+	params["kittys"] = kittys
+	if err = setter(s, params, db, c); err != nil {
+		return nil, err
+	}
 	if callbk != nil {
 		if err = callbk(s, db); err != nil {
 			tx.Rollback()
@@ -205,6 +215,12 @@ func (crud *crud) updateObj() error {
 
 	if err := qry.update(); err != nil {
 		tx.Rollback()
+		return err
+	}
+	params := make(map[string]interface{})
+	params["ms"] = s
+	params["kittys"] = kittys
+	if err := setter(s, params, db, c); err != nil {
 		return err
 	}
 

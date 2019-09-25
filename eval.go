@@ -74,17 +74,6 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 			}
 		} else if setter := GetSub(k, "setter"); len(setter) > 0 {
 			expr.f = f
-			if strings.Contains(setter, ".") && !strings.Contains(setter, "'") {
-				a := strings.LastIndex(setter, "(")
-				b := strings.Index(setter, ".")
-				model := setter[a+1 : b]
-				//res, err := queryObj(NewModelStruct(model), &SearchCondition{}, db, c)
-				res, err := queryObj(CreateModel(model), &SearchCondition{}, db, c)
-				if err != nil {
-					return err
-				}
-				expr.params[model] = res
-			}
 			res, err := expr.eval(setter)
 			if err != nil {
 				return err
