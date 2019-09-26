@@ -21,7 +21,7 @@ func (q *simpleQuery) create() (interface{}, error) {
 	modelName := q.Result.Name()
 
 	for _, f := range q.ModelStructs.Fields() {
-		if k := f.Tag("kitty"); strings.Contains(k, "param") && !f.IsZero() {
+		if k := f.Tag("kitty"); strings.Contains(k, "param:") && !f.IsZero() {
 			bindfield := GetSub(k, "param")
 			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
 				field := ToCamel(v[1])
@@ -74,7 +74,7 @@ func (q *simpleQuery) update() error {
 	}
 
 	for _, f := range q.ModelStructs.Fields() {
-		if k := f.Tag("kitty"); strings.Contains(k, "param") && !strings.Contains(k, "condition") && !f.IsZero() {
+		if k := f.Tag("kitty"); strings.Contains(k, "param:") && !strings.Contains(k, "condition") && !f.IsZero() {
 			bindfield := GetSub(k, "param")
 			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
 				field := ToCamel(v[1])
@@ -88,7 +88,7 @@ func (q *simpleQuery) update() error {
 		}
 	}
 	for _, f := range q.ModelStructs.Fields() {
-		if k := f.Tag("kitty"); strings.Contains(k, "condition") && !f.IsZero() {
+		if k := f.Tag("kitty"); strings.Contains(k, "param:") && strings.Contains(k, "condition") && !f.IsZero() {
 			bindfield := GetSub(k, "param")
 			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
 				field := ToCamel(v[1])

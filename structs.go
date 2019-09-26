@@ -61,48 +61,39 @@ func (s *Structs) CallMethod(name string, values ...reflect.Value) []reflect.Val
 
 // SetFieldValue ...
 func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
-	FK := f.Kind()
-
 	rv := DereferenceValue(reflect.ValueOf(value))
 	VK := rv.Kind()
 
 	RealType := reflect.TypeOf(f.Value())
 	FT := DereferenceType(RealType)
-	FK = FT.Kind()
+	FK := FT.Kind()
 
-	/*
-		if FK == reflect.Struct || FK == reflect.Slice || FK == reflect.Map {
-			default:
-				if RealType.Kind() != reflect.Ptr {
-					return f.Set(rv.Interface())
-				}
-				return f.Set(ptr(rv).Interface())
-			}
-		}*/
-
-	// 同一类型 ， 暂不在支持 map，结构体，切片
-	if VK == FK {
-		switch f.Value().(type) {
-		case time.Time:
-			//do nothing
-		default:
-			if RealType.Kind() != reflect.Ptr {
-				return f.Set(rv.Interface())
-			}
-			return f.Set(ptr(rv).Interface())
+	var f1 = func(rv reflect.Value) error {
+		var err error
+		if RealType.Kind() != reflect.Ptr {
+			err = f.Set(rv.Interface())
+		} else {
+			err = f.Set(ptr(rv).Interface())
 		}
+		if err != nil {
+			return fmt.Errorf("%s: %s", f.Name(), err.Error())
+		}
+		return nil
+	}
+	// 同一类型 ， 暂不在支持 map，结构体，切片
+	if VK == FK && FK != reflect.Struct && FK != reflect.Slice && FK != reflect.Map {
+		return f1(rv)
 	}
 	var x interface{}
 
 	if VK == reflect.String {
 		switch f.Value().(type) {
-		case time.Time:
+		case time.Time, *time.Time:
 			stamp, err := time.ParseInLocation("2006-01-02 15:04:05", rv.Interface().(string), time.Local)
 			if err == nil {
-				f.Set(stamp)
-				return nil
+				return f1(reflect.ValueOf(stamp))
 			}
-			return fmt.Errorf("%s :时间格式错误, 正确的格式: 2006-01-02 15:04:05", rv.Interface().(string))
+			return fmt.Errorf("%s: %s 时间格式错误, 正确的格式: 2006-01-02 15:04:05", f.Name(), rv.Interface().(string))
 		}
 		switch FK {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -111,28 +102,24 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 			x, _ = strconv.ParseUint(rv.Interface().(string), 10, 64)
 		case reflect.Float32, reflect.Float64:
 			x, _ = strconv.ParseFloat(rv.Interface().(string), 64)
-		default:
-			return fmt.Errorf("wrong kind. got: %s want: %s", VK, FK)
 		}
 	} else if FK >= reflect.Int && FK <= reflect.Float64 && VK >= reflect.Int && VK <= reflect.Float64 { // 同为整型
 		x = rv.Interface()
 	} else if FK == reflect.String && VK >= reflect.Int && VK <= reflect.Float64 {
-		f.Set(fmt.Sprintf("%v", rv))
-		return nil
+		str := fmt.Sprintf("%v", rv)
+		x = reflect.ValueOf(str).Interface()
 	}
 
 	if x != nil {
-		//	FT := reflect.TypeOf(f.Value())
-		v1 := reflect.ValueOf(x).Convert(FT) //.Interface()
-		if RealType.Kind() != reflect.Ptr {
-			f.Set(v1.Interface())
-		} else {
-			f.Set(ptr(v1).Interface())
-		}
-		return nil
+		v1 := reflect.ValueOf(x).Convert(FT)
+		return f1(v1)
 	}
 
-	return fmt.Errorf("Not Support kind. %s want: %s", VK, FK)
+	if FK == reflect.Struct || FK == reflect.Slice || FK == reflect.Map {
+		panic("")
+	}
+
+	return fmt.Errorf("%s: Not Support kind. %s want: %s", f.Name(), VK, FK)
 }
 
 // SetValue ...key 参数为蛇形 入 name_of_who

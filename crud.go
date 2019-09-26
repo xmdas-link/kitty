@@ -112,8 +112,11 @@ func (crud *crud) createObj() (interface{}, error) {
 	tx := db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("create error. something happen...")
 			tx.Rollback()
+			fmt.Println("create error. something happen...")
+			if kittyMode == debugCode {
+				panic("create error. something happen...")
+			}
 		}
 	}()
 
@@ -140,8 +143,9 @@ func (crud *crud) createObj() (interface{}, error) {
 	}
 	for _, v := range kittys.kittys {
 		f := s.Field(v.FieldName)
-		s.SetFieldValue(f, v.structs.raw)
+		f.Set(v.structs.raw)
 	}
+
 	params := make(map[string]interface{})
 	params["ms"] = s
 	params["kittys"] = kittys
@@ -191,8 +195,11 @@ func (crud *crud) updateObj() error {
 	tx := db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("update error. something happen...")
 			tx.Rollback()
+			fmt.Println("update error. something happen...")
+			if kittyMode == debugCode {
+				panic("update error. something happen...")
+			}
 		}
 	}()
 

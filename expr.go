@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/structs"
@@ -27,6 +26,13 @@ func (e *expr) init() {
 	functions := e.functions
 	for k, v := range exprFuncs {
 		functions[k] = v
+	}
+
+	var setField = func(f *structs.Field, value interface{}) error {
+		if err := f.Set(value); err != nil {
+			return fmt.Errorf("%s: %s", f.Name(), err.Error())
+		}
+		return nil
 	}
 
 	functions["len"] = func(args ...interface{}) (interface{}, error) {
@@ -53,26 +59,32 @@ func (e *expr) init() {
 	}
 
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
-		field := args[0].(string)
-		if strings.Contains(field, ".") { //xxx.xx
-			v := strings.Split(field, ".")
-			field = ToCamel(v[0])
-			value := e.s.Field(field).Field(ToCamel(v[1])).Value()
-			return value, nil
+		strfield := args[0].(string)
+		if strings.Contains(strfield, ".") { //xxx.xx
+			v := strings.Split(strfield, ".")
+			field := e.s.Field(ToCamel(v[0]))
+			if field.IsZero() {
+				return nil, nil
+			}
+			field = field.Field(ToCamel(v[1]))
+			if field.IsZero() {
+				return nil, nil
+			}
+			value := field.Value()
+			return nil, setField(e.f, value)
 		}
-		if f, ok := e.s.FieldOk(ToCamel(field)); ok {
+		if f, ok := e.s.FieldOk(ToCamel(strfield)); ok {
 			if !reflect.ValueOf(f.Value()).IsNil() {
 				return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 			}
 			return nil, nil
-
 		}
-		return nil, fmt.Errorf("$ unknown field %s", field)
+		return nil, fmt.Errorf("$ unknown field %s", strfield)
 	}
 	functions["set"] = func(args ...interface{}) (interface{}, error) {
-		e.s.SetFieldValue(e.f, args[0])
-		return nil, nil
+		return nil, e.s.SetFieldValue(e.f, args[0])
 	}
+
 	functions["db"] = func(args ...interface{}) (interface{}, error) {
 		s := e.s
 		db := e.db
@@ -103,7 +115,7 @@ func (e *expr) init() {
 
 		if !tx.First(ss.raw).RecordNotFound() {
 			v := ss.Field(ToCamel(fromfield)).Value()
-			s.SetFieldValue(e.f, v)
+			return nil, s.SetFieldValue(e.f, v)
 		}
 
 		return nil, nil
@@ -121,7 +133,7 @@ func (e *expr) init() {
 		ss := CreateModel(model) //NewModelStruct(model)
 
 		if db.Where(fmt.Sprintf("%s = ?", keyField), s.Field(valueField).Value()).First(ss.raw).Error == nil {
-			e.f.Set(ss.raw)
+			return nil, setField(e.f, ss.raw)
 		}
 
 		return nil, nil
@@ -174,13 +186,13 @@ func (e *expr) init() {
 
 		if tk.TypeOfField.Kind() == reflect.Struct {
 			if tx.First(ss.raw).Error == nil {
-				e.f.Set(ss.raw)
+				return nil, setField(e.f, ss.raw)
 			}
 		} else if tk.TypeOfField.Kind() == reflect.Slice {
 			objValue := makeSlice(reflect.TypeOf(ss.raw), 0)
 			result := objValue.Interface()
 			if tx.Find(result).Error == nil {
-				e.f.Set(reflect.ValueOf(result).Elem().Interface())
+				return nil, setField(e.f, reflect.ValueOf(result).Elem().Interface())
 			}
 		}
 
@@ -192,7 +204,8 @@ func (e *expr) init() {
 
 		if len(args) > 0 {
 			modelNameForCreate := strcase.ToSnake(e.f.Name())
-			count, _ := strconv.ParseInt(args[0].(string), 10, 64)
+			//count, _ := strconv.ParseInt(args[0].(string), 10, 64)
+			count := args[0].(float64)
 			slices := make([]*Structs, 0)
 			for i := 0; i < int(count); i++ {
 				screate := CreateModel(modelNameForCreate)
@@ -215,7 +228,9 @@ func (e *expr) init() {
 								for _, field := range ss.Fields() {
 									fname := field.Name()
 									if f, ok := screate.FieldOk(fname); ok {
-										screate.SetFieldValue(f, field.Value())
+										if err := screate.SetFieldValue(f, field.Value()); err != nil {
+											return nil, err
+										}
 									}
 								}
 							}
@@ -224,7 +239,9 @@ func (e *expr) init() {
 							for i := 0; i < len(slices); i++ {
 								screate := slices[i]
 								f := screate.Field(ToCamel(bindField))
-								screate.SetFieldValue(f, field.Value())
+								if err := screate.SetFieldValue(f, field.Value()); err != nil {
+									return nil, err
+								}
 							}
 						}
 					} else if tk.KindOfField == reflect.Struct {
@@ -233,7 +250,9 @@ func (e *expr) init() {
 							for _, subfield := range field.Fields() {
 								fname := subfield.Name()
 								if f, ok := screate.FieldOk(fname); ok {
-									screate.SetFieldValue(f, field.Value())
+									if err := screate.SetFieldValue(f, field.Value()); err != nil {
+										return nil, err
+									}
 								}
 							}
 						}
@@ -267,8 +286,9 @@ func (e *expr) init() {
 		return nil, errors.New("param error in batch_create")
 	}
 
-	var f1 = func(model string, args ...interface{}) (*Structs, error) {
-		strs := CreateModel(model)
+	var f1 = func(field *structs.Field, args ...interface{}) (*Structs, error) {
+		tk := (&FormField{field}).TypeAndKind()
+		strs := CreateModel(tk.ModelName)
 
 		params := strings.Split(args[0].(string), ",")
 		for _, v := range params {
@@ -288,35 +308,46 @@ func (e *expr) init() {
 	}
 
 	functions["qry"] = func(args ...interface{}) (interface{}, error) {
-		strs, err := f1(e.f.Name(), args[0:])
+
+		strs, err := f1(e.f, args...)
 		if err != nil {
 			return nil, err
 		}
 
-		return newcrud(&config{
+		res, err := newcrud(&config{
 			strs:   strs,
 			search: &SearchCondition{},
 			db:     e.db,
 			ctx:    e.ctx,
 		}).queryObj()
+
+		if res != nil {
+			return nil, setField(e.f, res)
+		}
+		return nil, err
 	}
 
 	functions["create"] = func(args ...interface{}) (interface{}, error) {
-		strs, err := f1(e.f.Name(), args[0:])
+		strs, err := f1(e.f, args...)
 		if err != nil {
 			return nil, err
 		}
 
-		return newcrud(&config{
+		res, err := newcrud(&config{
 			strs:   strs,
 			search: &SearchCondition{},
 			db:     e.db,
 			ctx:    e.ctx,
 		}).createObj()
+
+		if res != nil {
+			return nil, setField(e.f, res)
+		}
+		return nil, err
 	}
 
 	functions["update"] = func(args ...interface{}) (interface{}, error) {
-		strs, err := f1(e.f.Name(), args[0:])
+		strs, err := f1(e.f, args...)
 		if err != nil {
 			return nil, err
 		}
@@ -329,6 +360,39 @@ func (e *expr) init() {
 		}).updateObj()
 	}
 
+	functions["slice"] = func(args ...interface{}) (interface{}, error) {
+		if len(args) != 2 {
+			panic("")
+		}
+		//like slice('field_name', 2)
+		//第一个参数，字段名称
+		//第二个参数，索引
+		strfield := args[0].(string)
+		subfield := ""
+		idx := int(args[1].(float64))
+		if strings.Contains(strfield, ".") {
+			v := strings.Split(strfield, ".")
+			strfield = v[0]
+			subfield = v[1]
+		}
+		field := e.s.Field(ToCamel(strfield))
+		if field.IsZero() {
+			return nil, fmt.Errorf("slice value is zero %s", field.Name())
+		}
+
+		fieldvalue := field.Value()
+		slicevalue := DereferenceValue(reflect.ValueOf(fieldvalue))
+		if slicevalue.Len() < idx {
+			return nil, fmt.Errorf("slice idx overflow %s", field.Name())
+		}
+
+		value := slicevalue.Index(idx).Interface()
+		if len(subfield) == 0 {
+			return nil, setField(e.f, value)
+		}
+		strs := createModelStructs(value)
+		return nil, setField(e.f, strs.Field(ToCamel(subfield)).Value())
+	}
 }
 
 func (e *expr) eval(expString string) (interface{}, error) {
