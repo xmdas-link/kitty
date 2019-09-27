@@ -199,9 +199,7 @@ func (e *expr) init() {
 		return nil, nil
 	}
 
-	functions["batch_create"] = func(args ...interface{}) (interface{}, error) {
-		s := e.s
-
+	var batchCreate = func(s *Structs, args ...interface{}) (interface{}, error) {
 		if len(args) > 0 {
 			modelNameForCreate := strcase.ToSnake(e.f.Name())
 			//count, _ := strconv.ParseInt(args[0].(string), 10, 64)
@@ -295,7 +293,7 @@ func (e *expr) init() {
 			param := strings.Split(v, "=") //like id=id_list ; id=1 ; count=10
 			field := strs.Field(ToCamel(param[0]))
 			if f, ok := e.s.FieldOk(ToCamel(param[1])); ok {
-				if err := field.Set(f.Value()); err != nil {
+				if err := strs.SetFieldValue(field, f.Value()); err != nil {
 					return nil, err
 				}
 			} else {
@@ -308,7 +306,6 @@ func (e *expr) init() {
 	}
 
 	functions["qry"] = func(args ...interface{}) (interface{}, error) {
-
 		strs, err := f1(e.f, args...)
 		if err != nil {
 			return nil, err
@@ -327,7 +324,43 @@ func (e *expr) init() {
 		return nil, err
 	}
 
+	functions["create_if"] = func(args ...interface{}) (interface{}, error) {
+		if len(args) < 2 {
+			panic("")
+		}
+		vstr := strings.Split(args[0].(string), "=") // like user_id=1 or user_id = field
+		field := e.s.Field(ToCamel(vstr[0]))
+		fieldvalue := reflect.ValueOf(field.Value())
+		var comparevalue reflect.Value
+		if f, ok := e.s.FieldOk(ToCamel(vstr[1])); ok {
+			// 把比较的值赋给字段 ，做类型匹配
+			if err := setField(field, f.Value()); err != nil {
+				return nil, err
+			}
+			comparevalue = reflect.ValueOf(field.Value()) //
+		} else {
+			if err := setField(field, reflect.ValueOf(vstr[1])); err != nil {
+				return nil, err
+			}
+			comparevalue = reflect.ValueOf(field.Value())
+		}
+		//重新设置
+		if err := setField(field, fieldvalue.Interface()); err != nil {
+			return nil, err
+		}
+		if DereferenceValue(fieldvalue).Interface() != DereferenceValue(comparevalue).Interface() {
+			return nil, nil
+		}
+		fun := functions["create"]
+		return fun(args[1:]...)
+	}
+
 	functions["create"] = func(args ...interface{}) (interface{}, error) {
+		tk := (&FormField{e.f}).TypeAndKind()
+		if tk.KindOfField == reflect.Slice {
+			return batchCreate(e.s, args...)
+		}
+
 		strs, err := f1(e.f, args...)
 		if err != nil {
 			return nil, err
@@ -341,7 +374,7 @@ func (e *expr) init() {
 		}).createObj()
 
 		if res != nil {
-			return nil, setField(e.f, res)
+			return nil, setField(e.f, strs.raw)
 		}
 		return nil, err
 	}

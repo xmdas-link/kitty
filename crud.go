@@ -110,15 +110,15 @@ func (crud *crud) createObj() (interface{}, error) {
 	}
 
 	tx := db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			fmt.Println("create error. something happen...")
-			if kittyMode == debugCode {
-				panic("create error. something happen...")
+
+	if kittyMode == releaseCode {
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+				fmt.Println("create error. something happen...")
 			}
-		}
-	}()
+		}()
+	}
 
 	qry := &simpleQuery{
 		db:           tx,
@@ -193,16 +193,15 @@ func (crud *crud) updateObj() error {
 		return err
 	}
 	tx := db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			fmt.Println("update error. something happen...")
-			if kittyMode == debugCode {
-				panic("update error. something happen...")
+	if kittyMode == releaseCode {
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+				fmt.Println("update error. something happen...")
 			}
-		}
-	}()
-
+		}()
+	}
+	
 	qry := &simpleQuery{
 		db:           tx,
 		ModelStructs: s,

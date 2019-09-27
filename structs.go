@@ -116,7 +116,7 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 	}
 
 	if FK == reflect.Struct || FK == reflect.Slice || FK == reflect.Map {
-		panic("")
+		return f.Set(value)
 	}
 
 	return fmt.Errorf("%s: Not Support kind. %s want: %s", f.Name(), VK, FK)
