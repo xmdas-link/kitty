@@ -35,7 +35,9 @@ func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 				return err
 			}
 			if res != nil {
-				s.SetFieldValue(f, res)
+				if err = s.SetFieldValue(f, res); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -50,7 +52,7 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 		params:    param,
 		ctx:       c,
 	}
-
+	expr.params["s"] = s.raw
 	expr.init()
 	for _, f := range s.Fields() {
 		k := f.Tag("kitty")
@@ -79,7 +81,9 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 				return err
 			}
 			if res != nil {
-				s.SetFieldValue(f, res)
+				if err = s.SetFieldValue(f, res); err != nil {
+					return err
+				}
 			}
 		}
 	}

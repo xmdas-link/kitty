@@ -92,7 +92,7 @@ func (q *simpleQuery) update() error {
 			bindfield := GetSub(k, "param")
 			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
 				field := ToCamel(v[1])
-				qryformat := q.ModelStructs.buildFormParamQuery(modelName, field)
+				qryformat := q.ModelStructs.buildFormParamQueryCondition(modelName, field)
 				w := fmt.Sprintf("%s %s", v[1], qryformat.field)
 				tx = tx.Where(w, qryformat.v...)
 				whereCount++

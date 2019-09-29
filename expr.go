@@ -28,13 +28,6 @@ func (e *expr) init() {
 		functions[k] = v
 	}
 
-	var setField = func(f *structs.Field, value interface{}) error {
-		if err := f.Set(value); err != nil {
-			return fmt.Errorf("%s: %s", f.Name(), err.Error())
-		}
-		return nil
-	}
-
 	functions["len"] = func(args ...interface{}) (interface{}, error) {
 		length := reflect.ValueOf(args[0]).Len()
 		return (float64)(length), nil
@@ -43,12 +36,11 @@ func (e *expr) init() {
 		return fmt.Sprintf(args[0].(string), args[1:]...), nil
 	}
 	functions["default"] = func(args ...interface{}) (interface{}, error) {
-		if reflect.ValueOf(e.f.Value()).IsNil() {
+		if e.f.IsZero() {
 			return args[0], nil
 		}
 		return nil, nil
 	}
-
 	functions["current"] = func(args ...interface{}) (interface{}, error) {
 		s := args[0].(string)
 		switch s {
@@ -60,29 +52,41 @@ func (e *expr) init() {
 
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
 		strfield := args[0].(string)
-		if strings.Contains(strfield, ".") { //xxx.xx
-			v := strings.Split(strfield, ".")
-			field := e.s.Field(ToCamel(v[0]))
-			if field.IsZero() {
-				return nil, nil
+		if strings.Contains(strfield, ".") { //xxx.xx.x
+			sliceIdx := 0
+			if len(args) == 2 {
+				sliceIdx = int(args[1].(float64))
 			}
-			field = field.Field(ToCamel(v[1]))
-			if field.IsZero() {
-				return nil, nil
-			}
-			value := field.Value()
-			return nil, setField(e.f, value)
+			return e.s.getValue(strfield, sliceIdx)
 		}
-		if f, ok := e.s.FieldOk(ToCamel(strfield)); ok {
-			if !reflect.ValueOf(f.Value()).IsNil() {
-				return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
+		if f, ok := e.s.FieldOk(ToCamel(strfield)); ok && !f.IsZero() {
+			fk := (&FormField{f}).TypeAndKind()
+			if fk.KindOfField == reflect.Slice {
+				thiskind := (&FormField{e.f}).TypeAndKind()
+				if thiskind.KindOfField == reflect.Struct {
+					if thiskind.ModelName != fk.ModelName {
+						return nil, fmt.Errorf("model does not match %s", strfield)
+					}
+					idx := int(args[1].(float64))
+					slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
+					if slicevalue.Len() < idx {
+						return nil, fmt.Errorf("slice idx overflow %s", f.Name())
+					}
+					return slicevalue.Index(idx).Interface(), nil
+				}
 			}
-			return nil, nil
+			return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 		}
 		return nil, fmt.Errorf("$ unknown field %s", strfield)
 	}
 	functions["set"] = func(args ...interface{}) (interface{}, error) {
-		return nil, e.s.SetFieldValue(e.f, args[0])
+		return args[0], nil
+	}
+	functions["set_if"] = func(args ...interface{}) (interface{}, error) {
+		if !args[0].(bool) {
+			return nil, nil
+		}
+		return args[1], nil
 	}
 
 	functions["db"] = func(args ...interface{}) (interface{}, error) {
@@ -90,52 +94,48 @@ func (e *expr) init() {
 		db := e.db
 		argv := args[0].(string)
 
-		v := strings.Split(argv, ".")
-		model := v[0]
-		fromfield := v[1]
-		key := ToCamel(v[2])
-		value := ToCamel(v[3])
+		//user.name.id=id
+		//user.name.id=user.id
+		v := strings.Split(argv, "=")
 
-		ss := CreateModel(model) //NewModelStruct(model)
-		keyField := ss.Field(key)
-		values := s.Field(value).Value()
+		v1 := strings.Split(v[0], ".")
+		model := v1[0]
+		fromfield := v1[1]
+		v2 := []string{v1[2], v[1]}
+		param := strings.Join(v2, "=")
 
-		if !DereferenceValue(reflect.ValueOf(values)).IsValid() {
-			return nil, fmt.Errorf("%s invalid value", value)
-		}
-
-		if err := ss.SetFieldValue(keyField, s.Field(value).Value()); err != nil {
+		ss := CreateModel(model)
+		if err := ss.fillValue(s, []string{param}); err != nil {
 			return nil, err
 		}
 
 		tx := db.Select(fromfield)
-		if key != "ID" {
+		
+		if ToCamel(v1[2])!="ID"{
 			tx = tx.Where(ss.raw)
 		}
 
 		if !tx.First(ss.raw).RecordNotFound() {
-			v := ss.Field(ToCamel(fromfield)).Value()
-			return nil, s.SetFieldValue(e.f, v)
+			return ss.Field(ToCamel(fromfield)).Value(), nil
 		}
 
 		return nil, nil
 	}
+
+	// rd 单条记录 -> 模型
 	functions["rd"] = func(args ...interface{}) (interface{}, error) {
-		s := e.s
 		db := e.db
 		argv := args[0].(string)
-
-		v := strings.Split(argv, ".")
-		keyField := v[0]
-		valueField := ToCamel(v[1])
+		v := strings.Split(argv, ",")
 
 		model := (&FormField{e.f}).TypeAndKind().ModelName
-		ss := CreateModel(model) //NewModelStruct(model)
-
-		if db.Where(fmt.Sprintf("%s = ?", keyField), s.Field(valueField).Value()).First(ss.raw).Error == nil {
-			return nil, setField(e.f, ss.raw)
+		ss := CreateModel(model)
+		if err := ss.fillValue(e.s, v); err != nil {
+			return nil, err
 		}
-
+		if db.Where(ss.raw).First(ss.raw).Error == nil {
+			return ss.raw, nil
+		}
 		return nil, nil
 	}
 
@@ -144,21 +144,17 @@ func (e *expr) init() {
 		db := e.db
 		tx := db
 
-		if len(args) > 0 { // 参数查询 product_id = product.id
-			argv := args[0].(string)
-			if len(argv) > 0 {
-				v := strings.Split(argv, "=")
-				keyField := v[0]
-
-				valueField := strings.Split(v[1], ".")
-				//product.id
-				field := s.Field(ToCamel(valueField[0])).Field(ToCamel(valueField[1]))
-				tx = tx.Where(fmt.Sprintf("%s = ?", keyField), field.Value())
-			}
-		}
-
 		tk := (&FormField{e.f}).TypeAndKind()
 		model := tk.ModelName
+		ss := CreateModel(model)
+
+		if len(args) > 0 { // 参数查询 product_id = product.id
+			argv := args[0].(string)
+			v := strings.Split(argv, ",")
+			if err := ss.fillValue(e.s, v); err != nil {
+				return nil, err
+			}
+		}
 
 		if ks := e.params["kittys"]; ks != nil {
 			if kk, ok := ks.(*kittys); ok {
@@ -182,17 +178,15 @@ func (e *expr) init() {
 			}
 		}
 
-		ss := CreateModel(model) //NewModelStruct(model)
-
 		if tk.TypeOfField.Kind() == reflect.Struct {
-			if tx.First(ss.raw).Error == nil {
-				return nil, setField(e.f, ss.raw)
+			if tx.Where(ss.raw).First(ss.raw).Error == nil {
+				return ss.raw, nil
 			}
 		} else if tk.TypeOfField.Kind() == reflect.Slice {
 			objValue := makeSlice(reflect.TypeOf(ss.raw), 0)
 			result := objValue.Interface()
-			if tx.Find(result).Error == nil {
-				return nil, setField(e.f, reflect.ValueOf(result).Elem().Interface())
+			if tx.Where(ss.raw).Find(result).Error == nil {
+				return reflect.ValueOf(result).Elem().Interface(), nil
 			}
 		}
 
@@ -287,22 +281,8 @@ func (e *expr) init() {
 	var f1 = func(field *structs.Field, args ...interface{}) (*Structs, error) {
 		tk := (&FormField{field}).TypeAndKind()
 		strs := CreateModel(tk.ModelName)
-
 		params := strings.Split(args[0].(string), ",")
-		for _, v := range params {
-			param := strings.Split(v, "=") //like id=id_list ; id=1 ; count=10
-			field := strs.Field(ToCamel(param[0]))
-			if f, ok := e.s.FieldOk(ToCamel(param[1])); ok {
-				if err := strs.SetFieldValue(field, f.Value()); err != nil {
-					return nil, err
-				}
-			} else {
-				if err := strs.SetFieldValue(field, param[1]); err != nil {
-					return nil, err
-				}
-			}
-		}
-		return strs, nil
+		return strs, strs.fillValue(e.s, params)
 	}
 
 	functions["qry"] = func(args ...interface{}) (interface{}, error) {
@@ -311,44 +291,19 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		res, err := newcrud(&config{
+		return newcrud(&config{
 			strs:   strs,
 			search: &SearchCondition{},
 			db:     e.db,
 			ctx:    e.ctx,
 		}).queryObj()
-
-		if res != nil {
-			return nil, setField(e.f, res)
-		}
-		return nil, err
 	}
 
 	functions["create_if"] = func(args ...interface{}) (interface{}, error) {
 		if len(args) < 2 {
 			panic("")
 		}
-		vstr := strings.Split(args[0].(string), "=") // like user_id=1 or user_id = field
-		field := e.s.Field(ToCamel(vstr[0]))
-		fieldvalue := reflect.ValueOf(field.Value())
-		var comparevalue reflect.Value
-		if f, ok := e.s.FieldOk(ToCamel(vstr[1])); ok {
-			// 把比较的值赋给字段 ，做类型匹配
-			if err := setField(field, f.Value()); err != nil {
-				return nil, err
-			}
-			comparevalue = reflect.ValueOf(field.Value()) //
-		} else {
-			if err := setField(field, reflect.ValueOf(vstr[1])); err != nil {
-				return nil, err
-			}
-			comparevalue = reflect.ValueOf(field.Value())
-		}
-		//重新设置
-		if err := setField(field, fieldvalue.Interface()); err != nil {
-			return nil, err
-		}
-		if DereferenceValue(fieldvalue).Interface() != DereferenceValue(comparevalue).Interface() {
+		if !args[0].(bool) {
 			return nil, nil
 		}
 		fun := functions["create"]
@@ -374,9 +329,20 @@ func (e *expr) init() {
 		}).createObj()
 
 		if res != nil {
-			return nil, setField(e.f, strs.raw)
+			return strs.raw, nil
 		}
 		return nil, err
+	}
+
+	functions["update_if"] = func(args ...interface{}) (interface{}, error) {
+		if len(args) < 2 {
+			panic("")
+		}
+		if !args[0].(bool) {
+			return nil, nil
+		}
+		fun := functions["update"]
+		return fun(args[1:]...)
 	}
 
 	functions["update"] = func(args ...interface{}) (interface{}, error) {
@@ -392,46 +358,53 @@ func (e *expr) init() {
 			ctx:    e.ctx,
 		}).updateObj()
 	}
-
-	functions["slice"] = func(args ...interface{}) (interface{}, error) {
-		if len(args) != 2 {
-			panic("")
-		}
-		//like slice('field_name', 2)
-		//第一个参数，字段名称
-		//第二个参数，索引
-		strfield := args[0].(string)
-		subfield := ""
-		idx := int(args[1].(float64))
-		if strings.Contains(strfield, ".") {
-			v := strings.Split(strfield, ".")
-			strfield = v[0]
-			subfield = v[1]
-		}
-		field := e.s.Field(ToCamel(strfield))
-		if field.IsZero() {
-			return nil, fmt.Errorf("slice value is zero %s", field.Name())
-		}
-
-		fieldvalue := field.Value()
-		slicevalue := DereferenceValue(reflect.ValueOf(fieldvalue))
-		if slicevalue.Len() < idx {
-			return nil, fmt.Errorf("slice idx overflow %s", field.Name())
-		}
-
-		value := slicevalue.Index(idx).Interface()
-		if len(subfield) == 0 {
-			return nil, setField(e.f, value)
-		}
-		strs := createModelStructs(value)
-		return nil, setField(e.f, strs.Field(ToCamel(subfield)).Value())
-	}
 }
 
 func (e *expr) eval(expString string) (interface{}, error) {
+	if strings.Contains(expString, "create_if") || strings.Contains(expString, "update_if") || strings.Contains(expString, "set_if") {
+		//create_if(result==1 && name==hello,'user_id=id,user_name=name')
+		a1 := strings.Index(expString, "(")
+		b1 := strings.Index(expString, ",")
+		condition := expString[a1+1 : b1] // result==1 && name==hello
+		key := []string{"&&", "==", "||", ">", ">=", "<", "<=", "!="}
+		for _, v := range key {
+			condition = strings.ReplaceAll(condition, v, ",")
+		}
+		key = strings.Split(condition, ",")
+		for _, v := range key {
+			fieldName := strings.TrimSpace(v)
+			if len(fieldName) > 0 && e.params[fieldName] == nil {
+				if strings.Contains(fieldName, ".") {
+					if v, err := e.s.getValue(fieldName, 0); err == nil {
+						str := strings.ReplaceAll(fieldName, ".", "_")
+						expString = strings.ReplaceAll(expString, fieldName, str)
+						e.params[str] = v
+					}
+				} else if f, ok := e.s.FieldOk(ToCamel(fieldName)); ok {
+					e.params[fieldName] = DereferenceValue(reflect.ValueOf(f.Value())).Interface()
+				}
+			}
+		}
+	}
+
 	expression, err := govaluate.NewEvaluableExpressionWithFunctions(expString, e.functions)
 	if err != nil {
 		return nil, err
 	}
 	return expression.Evaluate(e.params)
+}
+
+// Eval for test
+func Eval(s *Structs, f *structs.Field, db *gorm.DB, exp string) (interface{}, error) {
+	expr := &expr{
+		db:        db,
+		s:         s,
+		f:         f,
+		functions: make(map[string]govaluate.ExpressionFunction),
+		params:    make(map[string]interface{}),
+	}
+	expr.params["s"] = s.raw
+	expr.init()
+
+	return expr.eval(exp)
 }

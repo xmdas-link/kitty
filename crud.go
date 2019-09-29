@@ -41,7 +41,9 @@ func (crud *crud) queryObj() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
-	getter(s, make(map[string]interface{}), db, c)
+	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
 
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
@@ -96,7 +98,9 @@ func (crud *crud) createObj() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
-	getter(s, make(map[string]interface{}), db, c)
+	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
 
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
@@ -179,7 +183,9 @@ func (crud *crud) updateObj() error {
 		}
 	}
 
-	getter(s, make(map[string]interface{}), db, c)
+	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+		return err
+	}
 
 	if err := vd.Validate(s.raw); err != nil {
 		return err
@@ -201,7 +207,7 @@ func (crud *crud) updateObj() error {
 			}
 		}()
 	}
-	
+
 	qry := &simpleQuery{
 		db:           tx,
 		ModelStructs: s,

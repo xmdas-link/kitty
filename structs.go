@@ -68,6 +68,10 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 	FT := DereferenceType(RealType)
 	FK := FT.Kind()
 
+	if FK == reflect.Map {
+		panic("not support map kind")
+	}
+
 	var f1 = func(rv reflect.Value) error {
 		var err error
 		if RealType.Kind() != reflect.Ptr {
@@ -81,7 +85,7 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 		return nil
 	}
 	// 同一类型 ， 暂不在支持 map，结构体，切片
-	if VK == FK && FK != reflect.Struct && FK != reflect.Slice && FK != reflect.Map {
+	if VK == FK && FK != reflect.Struct && FK != reflect.Slice {
 		return f1(rv)
 	}
 	var x interface{}
@@ -115,8 +119,11 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 		return f1(v1)
 	}
 
-	if FK == reflect.Struct || FK == reflect.Slice || FK == reflect.Map {
-		return f.Set(value)
+	if FK == reflect.Struct || FK == reflect.Slice {
+		if err := f.Set(value); err != nil {
+			return fmt.Errorf("%s: %s", f.Name(), err.Error())
+		}
+		return nil
 	}
 
 	return fmt.Errorf("%s: Not Support kind. %s want: %s", f.Name(), VK, FK)
@@ -138,6 +145,55 @@ func (s *Structs) SetValue(values map[string]interface{}) error {
 		}
 	}
 	return nil
+}
+
+// fillValue 从一个结构体赋值
+// params 可能是字段，可能是value
+// params like: name=username id=1 id=product.id id=product.data.id
+func (s *Structs) fillValue(src *Structs, params []string) error {
+	for _, param := range params {
+		p := strings.Split(param, "=")
+		if len(p) != 2 {
+			panic("")
+		}
+		field := s.Field(ToCamel(p[0]))
+		value, err := src.getValue(p[1], 0)
+		if err != nil {
+			return err
+		}
+		if err := s.SetFieldValue(field, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// param可能是字段，也可能普通字符串. 如果非字段，则返回该param
+// param可能包含及联，则遇到slice的时候，默认读取第一个。
+func (s *Structs) getValue(param string, sliceIdx int) (interface{}, error) {
+	if strings.Contains(param, ".") {
+		vv := strings.Split(param, ".")
+		field := s.Field(ToCamel(vv[0]))
+		fieldvalue := field.Value()
+		tk := (&FormField{field}).TypeAndKind()
+		if tk.KindOfField != reflect.Slice && tk.KindOfField != reflect.Struct {
+			panic("")
+		}
+		if tk.KindOfField == reflect.Slice {
+			slicevalue := DereferenceValue(reflect.ValueOf(fieldvalue))
+			if slicevalue.Len() < sliceIdx {
+				return nil, fmt.Errorf("slice idx overflow %s", field.Name())
+			}
+			fieldvalue = slicevalue.Index(sliceIdx).Interface()
+		}
+		ss := createModelStructs(fieldvalue)
+		p := strings.Join(vv[1:], ".")
+		return ss.getValue(p, sliceIdx)
+	}
+	if f, ok := s.FieldOk(ToCamel(param)); ok {
+		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
+	}
+	return param, nil
 }
 
 func (s *Structs) setStructValue(field *structs.Field, values map[string]interface{}) error {
@@ -365,6 +421,26 @@ func (s *Structs) buildFormParamQuery(modelname, fieldname string) *fieldQryForm
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel //param:order_item.order_id
 		if k := field.Tag("kitty"); strings.Contains(k, bindParam) && !field.IsZero() {
+			bindField := strings.Split(GetSub(k, "param"), ".")[1]
+			fname := strcase.ToSnake(fieldname)
+			if bindField == fname {
+				if strcase.ToSnake(field.Name()) == fname {
+					return (&FormField{field}).toQuery()
+				}
+				//特殊的情况：当having的时候，form参数绑定的字段不是model的字段，而是兄弟字段
+				return (&FormField{field}).toQuery()
+			}
+		}
+	}
+	return nil
+}
+
+// BuildFormParamQuery ....
+func (s *Structs) buildFormParamQueryCondition(modelname, fieldname string) *fieldQryFormat {
+	withModel := strcase.ToSnake(modelname)
+	for _, field := range s.Fields() {
+		bindParam := "param:" + withModel //param:order_item.order_id
+		if k := field.Tag("kitty"); strings.Contains(k, bindParam) && strings.Contains(k, "condition") && !field.IsZero() {
 			bindField := strings.Split(GetSub(k, "param"), ".")[1]
 			fname := strcase.ToSnake(fieldname)
 			if bindField == fname {
