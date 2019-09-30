@@ -190,6 +190,7 @@ func (s *Structs) getValue(param string, sliceIdx int) (interface{}, error) {
 		p := strings.Join(vv[1:], ".")
 		return ss.getValue(p, sliceIdx)
 	}
+	param = strings.ReplaceAll(param, "`", "")
 	if f, ok := s.FieldOk(ToCamel(param)); ok {
 		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 	}

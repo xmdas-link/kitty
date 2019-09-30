@@ -150,6 +150,12 @@ func (crud *crud) createObj() (interface{}, error) {
 		f.Set(v.structs.raw)
 	}
 
+	if f, ok := s.FieldOk("Data"); ok {
+		if err := f.Set(res); err != nil {
+			return nil, err
+		}
+	}
+
 	params := make(map[string]interface{})
 	params["ms"] = s
 	params["kittys"] = kittys
@@ -161,13 +167,12 @@ func (crud *crud) createObj() (interface{}, error) {
 			tx.Rollback()
 			return nil, err
 		}
-
 	}
 
-	return res, tx.Commit().Error
+	return s.raw, tx.Commit().Error
 }
 
-func (crud *crud) updateObj() error {
+func (crud *crud) updateObj() (interface{}, error) {
 	var (
 		s      = crud.strs
 		search = crud.search
@@ -179,16 +184,16 @@ func (crud *crud) updateObj() error {
 		vm := tagexpr.New("te")
 		r := vm.MustRun(s.raw)
 		if !r.Eval("ID").(bool) {
-			return fmt.Errorf(r.Eval("ID@msg").(string))
+			return nil, fmt.Errorf(r.Eval("ID@msg").(string))
 		}
 	}
 
 	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := vd.Validate(s.raw); err != nil {
-		return err
+		return nil, err
 	}
 
 	kittys := &kittys{
@@ -196,7 +201,7 @@ func (crud *crud) updateObj() error {
 		db:           db,
 	}
 	if err := kittys.parse(); err != nil {
-		return err
+		return nil, err
 	}
 	tx := db.Begin()
 	if kittyMode == releaseCode {
@@ -227,23 +232,23 @@ func (crud *crud) updateObj() error {
 
 	if err := qry.update(); err != nil {
 		tx.Rollback()
-		return err
+		return nil, err
 	}
 	params := make(map[string]interface{})
 	params["ms"] = s
 	params["kittys"] = kittys
 	if err := setter(s, params, db, c); err != nil {
-		return err
+		return nil, err
 	}
 
 	if callbk != nil {
 		if err := callbk(s, db); err != nil {
 			tx.Rollback()
-			return err
+			return nil, err
 		}
 	}
 
-	return tx.Commit().Error
+	return s.raw, tx.Commit().Error
 }
 
 //

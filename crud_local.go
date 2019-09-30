@@ -46,7 +46,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	case "R":
 		res, err = crud.queryObj()
 	case "U":
-		err = crud.updateObj()
+		res, err = crud.updateObj()
 	default:
 		return nil, errors.New("unknown model action")
 	}

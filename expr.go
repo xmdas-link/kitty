@@ -110,8 +110,8 @@ func (e *expr) init() {
 		}
 
 		tx := db.Select(fromfield)
-		
-		if ToCamel(v1[2])!="ID"{
+
+		if ToCamel(v1[2]) != "ID" {
 			tx = tx.Where(ss.raw)
 		}
 
@@ -119,6 +119,66 @@ func (e *expr) init() {
 			return ss.Field(ToCamel(fromfield)).Value(), nil
 		}
 
+		return nil, nil
+	}
+
+	//创建单条记录
+	functions["rd_create_if"] = func(args ...interface{}) (interface{}, error) {
+		if !args[0].(bool) {
+			return nil, nil
+		}
+		fun := functions["rd_create"]
+		return fun(args[1:]...)
+	}
+	//更新单条记录
+	functions["rd_update_if"] = func(args ...interface{}) (interface{}, error) {
+		if !args[0].(bool) {
+			return nil, nil
+		}
+		fun := functions["rd_update"]
+		return fun(args[1:]...)
+	}
+
+	//创建单条记录
+	functions["rd_create"] = func(args ...interface{}) (interface{}, error) {
+		db := e.db
+		argv := args[0].(string)
+		v := strings.Split(argv, ",")
+
+		model := (&FormField{e.f}).TypeAndKind().ModelName
+		ss := CreateModel(model)
+		if err := ss.fillValue(e.s, v); err != nil {
+			return nil, err
+		}
+		if db.Create(ss.raw).Error == nil {
+			return ss.raw, nil
+		}
+		return nil, nil
+	}
+
+	//更新单条记录  格式  update:xx=xx, where: xx=xx
+	functions["rd_update"] = func(args ...interface{}) (interface{}, error) {
+		db := e.db
+		updateCondition := args[0].(string)
+		whereCondition := args[1].(string)
+
+		model := (&FormField{e.f}).TypeAndKind().ModelName
+		sUpdate := CreateModel(model)
+		sWhere := CreateModel(model)
+
+		vUpdate := strings.Split(updateCondition, ",")
+		if err := sUpdate.fillValue(e.s, vUpdate); err != nil {
+			return nil, err
+		}
+
+		vWhere := strings.Split(whereCondition, ",")
+		if err := sWhere.fillValue(e.s, vWhere); err != nil {
+			return nil, err
+		}
+
+		if err := db.Model(CreateModel(model).raw).Where(sWhere.raw).Updates(sUpdate.raw).Error; err != nil {
+			return nil, err
+		}
 		return nil, nil
 	}
 
@@ -351,47 +411,89 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		return nil, newcrud(&config{
+		return newcrud(&config{
 			strs:   strs,
 			search: &SearchCondition{},
 			db:     e.db,
 			ctx:    e.ctx,
 		}).updateObj()
 	}
+	functions["vf"] = func(args ...interface{}) (interface{}, error) {
+		if !args[0].(bool) {
+			return nil, errors.New(args[1].(string))
+		}
+		return nil, nil
+	}
 }
 
-func (e *expr) eval(expString string) (interface{}, error) {
-	if strings.Contains(expString, "create_if") || strings.Contains(expString, "update_if") || strings.Contains(expString, "set_if") {
-		//create_if(result==1 && name==hello,'user_id=id,user_name=name')
-		a1 := strings.Index(expString, "(")
-		b1 := strings.Index(expString, ",")
-		condition := expString[a1+1 : b1] // result==1 && name==hello
-		key := []string{"&&", "==", "||", ">", ">=", "<", "<=", "!="}
-		for _, v := range key {
-			condition = strings.ReplaceAll(condition, v, ",")
-		}
-		key = strings.Split(condition, ",")
-		for _, v := range key {
-			fieldName := strings.TrimSpace(v)
-			if len(fieldName) > 0 && e.params[fieldName] == nil {
-				if strings.Contains(fieldName, ".") {
-					if v, err := e.s.getValue(fieldName, 0); err == nil {
+var sectionFunc = func(s *Structs, sectionExp string, params map[string]interface{}) (string, error) {
+	keys := []string{"create_if", "update_if", "set_if", "vf"}
+	for _, k := range keys {
+		if strings.Contains(sectionExp, k) {
+			//create_if(result==1 && name==hello,'user_id=id,user_name=name')
+			a1 := strings.Index(sectionExp, "(")
+			b1 := strings.Index(sectionExp, ",")
+			condition := sectionExp[a1+1 : b1] // result==1 && name==hello
+			key := []string{"&&", "==", "||", ">", ">=", "<", "<=", "!="}
+			for _, v := range key {
+				condition = strings.ReplaceAll(condition, v, ",")
+			}
+			key = strings.Split(condition, ",")
+			for _, v := range key {
+				fieldName := strings.TrimSpace(v)
+				if len(fieldName) > 0 && fieldName != "nil" && params[fieldName] == nil {
+					if strings.Contains(fieldName, ".") {
+						v, err := s.getValue(fieldName, 0)
+						if err != nil {
+							return sectionExp, err
+						}
 						str := strings.ReplaceAll(fieldName, ".", "_")
-						expString = strings.ReplaceAll(expString, fieldName, str)
-						e.params[str] = v
+						sectionExp = strings.ReplaceAll(sectionExp, fieldName, str)
+						params[str] = v
+
+					} else if f, ok := s.FieldOk(ToCamel(fieldName)); ok {
+						if f.IsZero() {
+							if reflect.TypeOf(f.Value()).Kind() == reflect.Ptr {
+								params[fieldName] = nil
+							} else {
+								params[fieldName] = reflect.Zero(reflect.TypeOf(f.Value())).Interface()
+							}
+						} else {
+							params[fieldName] = DereferenceValue(reflect.ValueOf(f.Value())).Interface()
+						}
 					}
-				} else if f, ok := e.s.FieldOk(ToCamel(fieldName)); ok {
-					e.params[fieldName] = DereferenceValue(reflect.ValueOf(f.Value())).Interface()
 				}
 			}
 		}
 	}
+	return sectionExp, nil
+}
 
-	expression, err := govaluate.NewEvaluableExpressionWithFunctions(expString, e.functions)
-	if err != nil {
-		return nil, err
+func (e *expr) eval(expString string) (interface{}, error) {
+
+	sections := strings.Split(expString, "|")
+	for i, section := range sections {
+		ret, err := sectionFunc(e.s, section, e.params)
+		if err != nil {
+			return nil, err
+		}
+		sections[i] = ret
 	}
-	return expression.Evaluate(e.params)
+
+	var res interface{}
+	var err error
+
+	for _, section := range sections {
+		expression, err := govaluate.NewEvaluableExpressionWithFunctions(section, e.functions)
+		if err != nil {
+			return nil, err
+		}
+		res, err = expression.Evaluate(e.params)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, err
 }
 
 // Eval for test
@@ -404,6 +506,7 @@ func Eval(s *Structs, f *structs.Field, db *gorm.DB, exp string) (interface{}, e
 		params:    make(map[string]interface{}),
 	}
 	expr.params["s"] = s.raw
+	expr.params["nil"] = nil
 	expr.init()
 
 	return expr.eval(exp)
