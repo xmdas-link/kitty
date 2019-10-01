@@ -11,7 +11,7 @@ type query struct {
 	db           *gorm.DB
 	search       *SearchCondition
 	ModelStructs *Structs
-	queryString  []*fieldQryFormat //参数
+	queryString  []*FieldQryFormat //参数
 	queryStruct  interface{}       //参数
 }
 
@@ -19,7 +19,7 @@ func (q *query) prepare() *gorm.DB {
 	tx := q.db
 	tx = tx.Model(q.ModelStructs.raw)
 	for _, v := range q.queryString {
-		tx = tx.Where(v.field, v.v...)
+		tx = tx.Where(v.Field, v.Value...)
 	}
 	if q.queryStruct != nil {
 		tx = tx.Where(q.queryStruct)

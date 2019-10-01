@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/fatih/structs"
@@ -23,12 +24,17 @@ type expr struct {
 }
 
 func (e *expr) init() {
+	e.params["nil"] = nil
+
 	functions := e.functions
 	for k, v := range exprFuncs {
 		functions[k] = v
 	}
 
 	functions["len"] = func(args ...interface{}) (interface{}, error) {
+		if args == nil {
+			return (float64)(0), nil
+		}
 		length := reflect.ValueOf(args[0]).Len()
 		return (float64)(length), nil
 	}
@@ -52,27 +58,33 @@ func (e *expr) init() {
 
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
 		strfield := args[0].(string)
-		if strings.Contains(strfield, ".") { //xxx.xx.x
-			sliceIdx := 0
-			if len(args) == 2 {
-				sliceIdx = int(args[1].(float64))
-			}
-			return e.s.getValue(strfield, sliceIdx)
+		if strings.Contains(strfield, ".") { //xxx.xx.x or xxx[0].xx.x
+			return e.s.getValue(strfield)
 		}
-		if f, ok := e.s.FieldOk(ToCamel(strfield)); ok && !f.IsZero() {
-			fk := (&FormField{f}).TypeAndKind()
+		sliceIdx := -1
+		if i := strings.Index(strfield, "["); i > 0 {
+			b := strings.Index(strfield, "]")
+			str := strfield[i+1 : b]
+			strfield = strfield[:i]
+			idx, _ := strconv.ParseInt(str, 10, 64)
+			sliceIdx = int(idx)
+		}
+		if f, ok := e.s.FieldOk(ToCamel(strfield)); ok {
+			if f.IsZero() {
+				return nil, nil
+			}
+			fk := TypeKind(f)
 			if fk.KindOfField == reflect.Slice {
-				thiskind := (&FormField{e.f}).TypeAndKind()
+				thiskind := TypeKind(e.f)
 				if thiskind.KindOfField == reflect.Struct {
 					if thiskind.ModelName != fk.ModelName {
 						return nil, fmt.Errorf("model does not match %s", strfield)
 					}
-					idx := int(args[1].(float64))
 					slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
-					if slicevalue.Len() < idx {
+					if slicevalue.Len() < sliceIdx {
 						return nil, fmt.Errorf("slice idx overflow %s", f.Name())
 					}
-					return slicevalue.Index(idx).Interface(), nil
+					return slicevalue.Index(sliceIdx).Interface(), nil
 				}
 			}
 			return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
@@ -145,7 +157,7 @@ func (e *expr) init() {
 		argv := args[0].(string)
 		v := strings.Split(argv, ",")
 
-		model := (&FormField{e.f}).TypeAndKind().ModelName
+		model := TypeKind(e.f).ModelName
 		ss := CreateModel(model)
 		if err := ss.fillValue(e.s, v); err != nil {
 			return nil, err
@@ -162,7 +174,7 @@ func (e *expr) init() {
 		updateCondition := args[0].(string)
 		whereCondition := args[1].(string)
 
-		model := (&FormField{e.f}).TypeAndKind().ModelName
+		model := TypeKind(e.f).ModelName
 		sUpdate := CreateModel(model)
 		sWhere := CreateModel(model)
 
@@ -188,7 +200,7 @@ func (e *expr) init() {
 		argv := args[0].(string)
 		v := strings.Split(argv, ",")
 
-		model := (&FormField{e.f}).TypeAndKind().ModelName
+		model := TypeKind(e.f).ModelName
 		ss := CreateModel(model)
 		if err := ss.fillValue(e.s, v); err != nil {
 			return nil, err
@@ -204,7 +216,7 @@ func (e *expr) init() {
 		db := e.db
 		tx := db
 
-		tk := (&FormField{e.f}).TypeAndKind()
+		tk := TypeKind(e.f)
 		model := tk.ModelName
 		ss := CreateModel(model)
 
@@ -220,7 +232,7 @@ func (e *expr) init() {
 			if kk, ok := ks.(*kittys); ok {
 				if subqry := kk.subWhere(model); len(subqry) > 0 {
 					for _, v := range subqry {
-						tx = tx.Where(v.field, v.v...)
+						tx = tx.Where(v.Field, v.Value...)
 					}
 				}
 				j := kk.get(model)
@@ -244,9 +256,8 @@ func (e *expr) init() {
 			}
 		} else if tk.TypeOfField.Kind() == reflect.Slice {
 			objValue := makeSlice(reflect.TypeOf(ss.raw), 0)
-			result := objValue.Interface()
-			if tx.Where(ss.raw).Find(result).Error == nil {
-				return reflect.ValueOf(result).Elem().Interface(), nil
+			if tx.Where(ss.raw).Find(objValue.Interface()).Error == nil {
+				return objValue.Elem().Interface(), nil
 			}
 		}
 
@@ -267,7 +278,7 @@ func (e *expr) init() {
 			for _, field := range s.Fields() {
 				k := field.Tag("kitty")
 				if len(k) > 0 && strings.Contains(k, fmt.Sprintf("param:%s", modelNameForCreate)) {
-					tk := (&FormField{field}).TypeAndKind()
+					tk := TypeKind(field)
 					if tk.KindOfField == reflect.Slice { // []*Strcuts []*int
 						datavalue := field.Value() // slice
 						dslice := reflect.ValueOf(datavalue)
@@ -332,6 +343,15 @@ func (e *expr) init() {
 					return nil, err
 				}
 			}
+			if len(slices) > 0 {
+				objSlice := makeSlice(reflect.TypeOf(slices[0].raw), len(slices))
+				objValue := objSlice.Elem()
+				for i := 0; i < len(slices); i++ {
+					screate := slices[i]
+					objValue.Index(i).Set(reflect.ValueOf(screate.raw))
+				}
+				return objValue.Interface(), nil
+			}
 			return nil, nil
 		}
 
@@ -339,7 +359,7 @@ func (e *expr) init() {
 	}
 
 	var f1 = func(field *structs.Field, args ...interface{}) (*Structs, error) {
-		tk := (&FormField{field}).TypeAndKind()
+		tk := TypeKind(field)
 		strs := CreateModel(tk.ModelName)
 		params := strings.Split(args[0].(string), ",")
 		return strs, strs.fillValue(e.s, params)
@@ -371,7 +391,7 @@ func (e *expr) init() {
 	}
 
 	functions["create"] = func(args ...interface{}) (interface{}, error) {
-		tk := (&FormField{e.f}).TypeAndKind()
+		tk := TypeKind(e.f)
 		if tk.KindOfField == reflect.Slice {
 			return batchCreate(e.s, args...)
 		}
@@ -426,41 +446,80 @@ func (e *expr) init() {
 	}
 }
 
-var sectionFunc = func(s *Structs, sectionExp string, params map[string]interface{}) (string, error) {
-	keys := []string{"create_if", "update_if", "set_if", "vf"}
+var setParam = func(f *structs.Field, name string, params map[string]interface{}) {
+	if f.IsZero() {
+		if reflect.TypeOf(f.Value()).Kind() == reflect.Ptr {
+			params[name] = nil
+		} else {
+			params[name] = reflect.Zero(reflect.TypeOf(f.Value())).Interface()
+		}
+	} else {
+		params[name] = DereferenceValue(reflect.ValueOf(f.Value())).Interface()
+	}
+}
+
+var hasLetter = func(str string) bool {
+	for _, r := range str {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			return true
+		}
+	}
+	return false
+}
+
+var sectionFunc = func(s *Structs, curf *structs.Field, sectionExp string, params map[string]interface{}) (string, error) {
+
+	keys := []string{"create_if", "update_if", "set_if", "vf", "rd_create_if", "rd_update_if"}
 	for _, k := range keys {
 		if strings.Contains(sectionExp, k) {
 			//create_if(result==1 && name==hello,'user_id=id,user_name=name')
 			a1 := strings.Index(sectionExp, "(")
-			b1 := strings.Index(sectionExp, ",")
+			b1 := strings.LastIndex(sectionExp, ",")
 			condition := sectionExp[a1+1 : b1] // result==1 && name==hello
+			condition = strings.ReplaceAll(condition, ",", "$$") //等下要用，分割
 			key := []string{"&&", "==", "||", ">", ">=", "<", "<=", "!="}
 			for _, v := range key {
 				condition = strings.ReplaceAll(condition, v, ",")
 			}
 			key = strings.Split(condition, ",")
 			for _, v := range key {
-				fieldName := strings.TrimSpace(v)
-				if len(fieldName) > 0 && fieldName != "nil" && params[fieldName] == nil {
-					if strings.Contains(fieldName, ".") {
-						v, err := s.getValue(fieldName, 0)
+				fieldName := strings.ReplaceAll(v, "$$", ",") //替换回来
+				if len(fieldName) > 0 && hasLetter(fieldName) && fieldName != "nil" && params[fieldName] == nil {
+					if a := strings.Index(fieldName, "(this."); a > -1 { // len(this.name) / len(split(this.name,','))
+						b1 := strings.Index(fieldName[a+1:], ")")
+						b2 := strings.Index(fieldName[a+1:], ",")
+						if b1 != -1 && b2 != -1 {
+							if b1 < b2 {
+								fieldName = fieldName[a+1 : a+1+b1]
+							} else {
+								fieldName = fieldName[a+1 : a+1+b2]
+							}
+						} else if b1 != -1 {
+							fieldName = fieldName[a+1 : a+1+b1]
+						} else if b2 != -1 {
+							fieldName = fieldName[a+1 : a+1+b2]
+						} else {
+							panic("")
+						}
+					}
+					if strings.Contains(fieldName, ".") && !strings.Contains(fieldName, "'") {
+						a := strings.Index(fieldName, ".")
+						thisField := fieldName
+						if thisField[:a] == "this" { // like this.name
+							thisField = strings.Replace(fieldName, "this", curf.Name(), -1)
+						}
+						v, err := s.getValue(thisField)
 						if err != nil {
 							return sectionExp, err
 						}
 						str := strings.ReplaceAll(fieldName, ".", "_")
+						str = strings.ReplaceAll(str, "[", "_")
+						str = strings.ReplaceAll(str, "]", "_")
 						sectionExp = strings.ReplaceAll(sectionExp, fieldName, str)
 						params[str] = v
 
 					} else if f, ok := s.FieldOk(ToCamel(fieldName)); ok {
-						if f.IsZero() {
-							if reflect.TypeOf(f.Value()).Kind() == reflect.Ptr {
-								params[fieldName] = nil
-							} else {
-								params[fieldName] = reflect.Zero(reflect.TypeOf(f.Value())).Interface()
-							}
-						} else {
-							params[fieldName] = DereferenceValue(reflect.ValueOf(f.Value())).Interface()
-						}
+						setParam(f, fieldName, params)
 					}
 				}
 			}
@@ -469,35 +528,40 @@ var sectionFunc = func(s *Structs, sectionExp string, params map[string]interfac
 	return sectionExp, nil
 }
 
-func (e *expr) eval(expString string) (interface{}, error) {
-
-	sections := strings.Split(expString, "|")
-	for i, section := range sections {
-		ret, err := sectionFunc(e.s, section, e.params)
-		if err != nil {
-			return nil, err
-		}
-		sections[i] = ret
-	}
+func (e *expr) eval(expString string) error {
+	e.params["s"] = e.s.raw
 
 	var res interface{}
 	var err error
 
+	strExpress := strings.ReplaceAll(expString, "||", "$$")
+	sections := strings.Split(strExpress, "|")
 	for _, section := range sections {
+		section = strings.ReplaceAll(section, "$$", "||")
+		setParam(e.f, "this", e.params)
+		section, err = sectionFunc(e.s, e.f, section, e.params)
+		if err != nil {
+			return err
+		}
 		expression, err := govaluate.NewEvaluableExpressionWithFunctions(section, e.functions)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		res, err = expression.Evaluate(e.params)
 		if err != nil {
-			return nil, err
+			return err
+		}
+		if res != nil {
+			if err = e.s.SetFieldValue(e.f, res); err != nil {
+				return err
+			}
 		}
 	}
-	return res, err
+	return err
 }
 
 // Eval for test
-func Eval(s *Structs, f *structs.Field, db *gorm.DB, exp string) (interface{}, error) {
+func Eval(s *Structs, db *gorm.DB, f *structs.Field, exp string) error {
 	expr := &expr{
 		db:        db,
 		s:         s,

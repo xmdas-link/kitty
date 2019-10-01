@@ -35,9 +35,10 @@ type StructFieldInfo struct {
 	Relationship          string //belongs_to has_one has_many
 }
 
-type fieldQryFormat struct {
-	field string
-	v     []interface{}
+// FieldQryFormat 参数字段查询格式化
+type FieldQryFormat struct {
+	Field string
+	Value []interface{}
 }
 
 // createModelStructs ...
@@ -68,10 +69,6 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 	FT := DereferenceType(RealType)
 	FK := FT.Kind()
 
-	if FK == reflect.Map {
-		panic("not support map kind")
-	}
-
 	var f1 = func(rv reflect.Value) error {
 		var err error
 		if RealType.Kind() != reflect.Ptr {
@@ -84,21 +81,37 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 		}
 		return nil
 	}
-	// 同一类型 ， 暂不在支持 map，结构体，切片
-	if VK == FK && FK != reflect.Struct && FK != reflect.Slice {
+	// 同一类型
+	if VK == FK {
 		return f1(rv)
 	}
-	var x interface{}
 
-	if VK == reflect.String {
-		switch f.Value().(type) {
-		case time.Time, *time.Time:
+	switch f.Value().(type) {
+	case time.Time, *time.Time:
+		if VK == reflect.String {
 			stamp, err := time.ParseInLocation("2006-01-02 15:04:05", rv.Interface().(string), time.Local)
 			if err == nil {
 				return f1(reflect.ValueOf(stamp))
 			}
-			return fmt.Errorf("%s: %s 时间格式错误, 正确的格式: 2006-01-02 15:04:05", f.Name(), rv.Interface().(string))
+			i, err := strconv.ParseInt(rv.Interface().(string), 10, 64)
+			if err != nil {
+				return err
+			}
+			stamp = time.Unix(i, 0)
+			return f1(reflect.ValueOf(stamp))
 		}
+		if VK >= reflect.Int && VK <= reflect.Float64 {
+			str := fmt.Sprintf("%v", rv)
+			x, _ := strconv.ParseInt(str, 10, 64)
+			stamp := time.Unix(x, 0)
+			return f1(reflect.ValueOf(stamp))
+		}
+		return fmt.Errorf("%s: %v 时间格式错误", f.Name(), rv)
+	}
+
+	var x interface{}
+
+	if VK == reflect.String {
 		switch FK {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			x, _ = strconv.ParseInt(rv.Interface().(string), 10, 64)
@@ -119,7 +132,7 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 		return f1(v1)
 	}
 
-	if FK == reflect.Struct || FK == reflect.Slice {
+	if FK == reflect.Struct || FK == reflect.Slice || FK == reflect.Map {
 		if err := f.Set(value); err != nil {
 			return fmt.Errorf("%s: %s", f.Name(), err.Error())
 		}
@@ -157,7 +170,7 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 			panic("")
 		}
 		field := s.Field(ToCamel(p[0]))
-		value, err := src.getValue(p[1], 0)
+		value, err := src.getValue(p[1])
 		if err != nil {
 			return err
 		}
@@ -170,12 +183,27 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 
 // param可能是字段，也可能普通字符串. 如果非字段，则返回该param
 // param可能包含及联，则遇到slice的时候，默认读取第一个。
-func (s *Structs) getValue(param string, sliceIdx int) (interface{}, error) {
+// params like: name=username id=1 id=product.id id=product.data.id
+// name=function('abcd')
+func (s *Structs) getValue(param string) (interface{}, error) {
 	if strings.Contains(param, ".") {
 		vv := strings.Split(param, ".")
-		field := s.Field(ToCamel(vv[0]))
+
+		fieldName := vv[0]
+		sliceIdx := -1
+		if i := strings.Index(fieldName, "["); i > 0 {
+			b := strings.Index(fieldName, "]")
+			str := fieldName[i+1 : b]
+			fieldName = fieldName[:i]
+			idx, _ := strconv.ParseInt(str, 10, 64)
+			sliceIdx = int(idx)
+		}
+		field := s.Field(ToCamel(fieldName))
+		if field.IsZero() {
+			return nil, nil
+		}
 		fieldvalue := field.Value()
-		tk := (&FormField{field}).TypeAndKind()
+		tk := TypeKind(field)
 		if tk.KindOfField != reflect.Slice && tk.KindOfField != reflect.Struct {
 			panic("")
 		}
@@ -188,141 +216,13 @@ func (s *Structs) getValue(param string, sliceIdx int) (interface{}, error) {
 		}
 		ss := createModelStructs(fieldvalue)
 		p := strings.Join(vv[1:], ".")
-		return ss.getValue(p, sliceIdx)
+		return ss.getValue(p)
 	}
 	param = strings.ReplaceAll(param, "`", "")
 	if f, ok := s.FieldOk(ToCamel(param)); ok {
 		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 	}
 	return param, nil
-}
-
-func (s *Structs) setStructValue(field *structs.Field, values map[string]interface{}) error {
-	for k := range values {
-		if _, ok := field.FieldOk(ToCamel(k)); !ok {
-			return fmt.Errorf("field error %v", k)
-		}
-	}
-	for _, f := range field.Fields() {
-		name := f.Name()
-		if v, ok := values[name]; ok {
-			if err := s.SetFieldValue(f, v); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// SetID ...
-func (s *Structs) SetID(v uint64) {
-	field := s.Field("ID")
-	s.SetFieldValue(field, v)
-}
-
-// GetStructFieldInfo fieldname (elem) must struct
-func (s *Structs) GetStructFieldInfo(fieldname string) (fi StructFieldInfo, err error) {
-	if field, ok := s.FieldOk(fieldname); ok {
-		fi.TypeKind = (&FormField{field}).TypeAndKind()
-
-		if len(fi.TypeKind.ModelName) == 0 {
-			return fi, fmt.Errorf("invalid field %s, is not a struct", fieldname)
-
-		}
-		tag := field.Tag("gorm")
-		if len(tag) > 0 {
-			keys := strings.Split(tag, ";")
-			for _, key := range keys {
-				if strings.Contains(key, "association_foreignkey") {
-					fi.AssociationForeignkey = strings.Split(key, ":")[1]
-				} else if strings.Contains(key, "foreignkey") {
-					fi.ForeignKey = strings.Split(key, ":")[1]
-				}
-			}
-		}
-
-		if len(fi.AssociationForeignkey) == 0 {
-			fi.AssociationForeignkey = "ID"
-		}
-
-		testNewForeignKey := false
-		if len(fi.ForeignKey) == 0 {
-			fi.ForeignKey = ToCamel(fieldname) + "ID"
-			testNewForeignKey = true
-		}
-		//查找默认的字段 Email-> EmailId
-		// with belongs to
-		if _, ok := s.FieldOk(fi.ForeignKey); ok {
-			fi.Relationship = "belongs_to"
-		} else {
-			if testNewForeignKey {
-				fi.ForeignKey = s.Name() + "ID" // with has one...
-			}
-			ss := CreateModel(fi.TypeKind.ModelName) //NewModelStruct(fi.TypeKind.ModelName)
-			if _, ok := ss.FieldOk(fi.ForeignKey); ok {
-				if fi.TypeKind.KindOfField == reflect.Struct {
-					fi.Relationship = "has_one"
-				} else if fi.TypeKind.KindOfField == reflect.Slice {
-					fi.Relationship = "has_many"
-				}
-			} else {
-				fi.Relationship = "nothing"
-			}
-
-		}
-	}
-	return fi, nil
-}
-
-// FillStructField fieldname must struct
-func (s *Structs) FillStructField(fieldname string, values map[string][]interface{}) error {
-	fi, err := s.GetStructFieldInfo(fieldname)
-
-	if err != nil {
-		return err
-	}
-
-	field := s.Field(fieldname)
-	ss := CreateModel(fi.TypeKind.ModelName)
-
-	var objVaule interface{}
-	if fi.TypeKind.KindOfField == reflect.Struct {
-		for field, v := range values {
-			field = ToCamel(field)
-			ss.SetFieldValue(ss.Field(field), v[0])
-		}
-		objVaule = reflect.ValueOf(ss.raw).Interface()
-	} else if fi.TypeKind.KindOfField == reflect.Slice {
-		// 检查有几个
-		lenSlice := 0
-		for _, v := range values {
-			lenSlice = len(v)
-			break
-		}
-
-		slice := makeSlice(fi.TypeKind.TypeOfField, lenSlice) // []*Email []Email
-		elemField := fi.TypeKind.TypeOfField.Elem()           // like *Email Email
-		for i := 0; i < lenSlice; i++ {
-			for field, v := range values {
-				field = ToCamel(field)
-				ss.SetFieldValue(ss.Field(field), v[i])
-			}
-			vss := reflect.ValueOf(ss.raw)
-			for vss.Kind() != elemField.Kind() {
-				vss = vss.Elem()
-			}
-			slice.Elem().Index(i).Set(vss)
-		}
-		objVaule = slice.Interface()
-	}
-
-	vObj := reflect.ValueOf(objVaule)
-	if field.Kind() != reflect.Ptr && vObj.Kind() == reflect.Ptr {
-		vObj = vObj.Elem()
-	}
-
-	return field.Set(vObj.Interface())
-
 }
 
 // GetRelationsWithModel fieldname (elem) must struct -> email = user
@@ -372,6 +272,12 @@ func (s *Structs) ParseFormValues(values url.Values) error {
 		if len(k) > 0 && strings.Contains(k, "param") {
 			formfield := strcase.ToSnake(field.Name())
 			if formvalue, ok := values[formfield]; ok {
+				fk := TypeKind(field)
+				if fk.KindOfField == reflect.Slice {
+					if err := s.SetFieldValue(field, formvalue); err != nil {
+						return err
+					}
+				}
 				if err := s.SetFieldValue(field, formvalue[0]); err != nil {
 					return err
 				}
@@ -383,21 +289,21 @@ func (s *Structs) ParseFormValues(values url.Values) error {
 }
 
 // BuildFormQuery ...
-func (s *Structs) buildFormQuery(tblname, model string) []*fieldQryFormat {
+func (s *Structs) buildFormQuery(tblname, model string) []*FieldQryFormat {
 	withModel := strcase.ToSnake(model)
 	//	ss := NewModelStruct(withModel)
-	query := []*fieldQryFormat{}
+	query := []*FieldQryFormat{}
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel + "." //param:order_item.order_id
 		if k := field.Tag("kitty"); strings.Contains(k, bindParam) && !field.IsZero() {
 			bindField := strings.Split(GetSub(k, "param"), ".")[1]
-			if q := (&FormField{field}).toQuery(); q != nil {
+			if q := ToQuery(field); q != nil {
 				fname := strcase.ToSnake(bindField)
 				if len(tblname) > 0 {
-					q.field = fmt.Sprintf("%s.%s %s", tblname, fname, q.field)
+					q.Field = fmt.Sprintf("%s.%s %s", tblname, fname, q.Field)
 					//query = append(query, fmt.Sprintf("%s.%s %s", tblname, fname, q))
 				} else {
-					q.field = fmt.Sprintf("%s %s", fname, q.field)
+					q.Field = fmt.Sprintf("%s %s", fname, q.Field)
 					//query = append(query, fmt.Sprintf("%s %s", fname, q))
 				}
 				query = append(query, q)
@@ -408,16 +314,16 @@ func (s *Structs) buildFormQuery(tblname, model string) []*fieldQryFormat {
 }
 
 // BuildFormFieldQuery ....
-func (s *Structs) buildFormFieldQuery(fieldname string) *fieldQryFormat {
+func (s *Structs) buildFormFieldQuery(fieldname string) *FieldQryFormat {
 	FieldName := ToCamel(fieldname)
 	if field, ok := s.FieldOk(FieldName); ok && !field.IsZero() {
-		return (&FormField{field}).toQuery()
+		return ToQuery(field)
 	}
 	return nil
 }
 
 // BuildFormParamQuery ....
-func (s *Structs) buildFormParamQuery(modelname, fieldname string) *fieldQryFormat {
+func (s *Structs) buildFormParamQuery(modelname, fieldname string) *FieldQryFormat {
 	withModel := strcase.ToSnake(modelname)
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel //param:order_item.order_id
@@ -426,10 +332,10 @@ func (s *Structs) buildFormParamQuery(modelname, fieldname string) *fieldQryForm
 			fname := strcase.ToSnake(fieldname)
 			if bindField == fname {
 				if strcase.ToSnake(field.Name()) == fname {
-					return (&FormField{field}).toQuery()
+					return ToQuery(field)
 				}
 				//特殊的情况：当having的时候，form参数绑定的字段不是model的字段，而是兄弟字段
-				return (&FormField{field}).toQuery()
+				return ToQuery(field)
 			}
 		}
 	}
@@ -437,7 +343,7 @@ func (s *Structs) buildFormParamQuery(modelname, fieldname string) *fieldQryForm
 }
 
 // BuildFormParamQuery ....
-func (s *Structs) buildFormParamQueryCondition(modelname, fieldname string) *fieldQryFormat {
+func (s *Structs) buildFormParamQueryCondition(modelname, fieldname string) *FieldQryFormat {
 	withModel := strcase.ToSnake(modelname)
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel //param:order_item.order_id
@@ -446,10 +352,10 @@ func (s *Structs) buildFormParamQueryCondition(modelname, fieldname string) *fie
 			fname := strcase.ToSnake(fieldname)
 			if bindField == fname {
 				if strcase.ToSnake(field.Name()) == fname {
-					return (&FormField{field}).toQuery()
+					return ToQuery(field)
 				}
 				//特殊的情况：当having的时候，form参数绑定的字段不是model的字段，而是兄弟字段
-				return (&FormField{field}).toQuery()
+				return ToQuery(field)
 			}
 		}
 	}
@@ -474,7 +380,7 @@ func (s *Structs) nameAs(names map[string][]string) {
 	for _, field := range s.Fields() {
 		k := field.Tag("kitty")
 		if len(k) > 0 && strings.Contains(k, "bind:") {
-			typeKind := (&FormField{field}).TypeAndKind()
+			typeKind := TypeKind(field)
 			if strings.Contains(k, "bindresult") {
 				if strings.Contains(k, fmt.Sprintf("bind:%s", strcase.ToSnake(typeKind.ModelName))) {
 					f1(typeKind, k, names)
@@ -491,13 +397,8 @@ func (s *Structs) nameAs(names map[string][]string) {
 	//	return names
 }
 
-// FormField ...
-type FormField struct {
-	*structs.Field
-}
-
-// TypeAndKind 。。。
-func (field *FormField) TypeAndKind() FieldTypeAndKind {
+// TypeKind 。。。
+func TypeKind(field *structs.Field) FieldTypeAndKind {
 	TypeKind := FieldTypeAndKind{}
 
 	rt := DereferenceType(reflect.TypeOf(field.Value()))
@@ -521,25 +422,57 @@ func (field *FormField) TypeAndKind() FieldTypeAndKind {
 
 // ToQuery 转成 形如 Where("name IN (?)", []string{"jinzhu", "jinzhu 2"})
 // having 需要完全的字段匹配
-func (field *FormField) toQuery() *fieldQryFormat {
-	typeKind := field.TypeAndKind()
+func ToQuery(field *structs.Field) *FieldQryFormat {
+	typeKind := TypeKind(field)
 
 	if typeKind.KindOfField == reflect.Struct {
 		return nil
 	}
-
 	singleValue := DereferenceValue(reflect.ValueOf(field.Value()))
-
+	if typeKind.KindOfField == reflect.Slice {
+		return &FieldQryFormat{Field: "IN (?)", Value: []interface{}{singleValue.Interface()}}
+	}
 	compare := "="
 
 	if singleValue.Kind() == reflect.String {
-		s := singleValue.Interface().(string)
-		if strings.Contains(s, ",") {
-			v := strings.Split(s, ",")
+		str := singleValue.Interface().(string)
+		str = strings.TrimSpace(str)
+
+		// 模糊查询
+		fuzzyKey := []string{"%", "_", "["}
+		for _, v := range fuzzyKey {
+			if strings.Contains(str, v) {
+				return &FieldQryFormat{Field: "LIKE ?", Value: []interface{}{singleValue.Interface()}}
+			}
+		}
+
+		//查询绑定的模型字段类型
+		k := field.Tag("kitty")
+		if !strings.Contains(k, "param:") {
+			panic("")
+		}
+		bindField := strings.Split(GetSub(k, "param"), ".") //user.name
+		s := CreateModel(bindField[0])
+		value := s.Field(ToCamel(bindField[1])).Value()
+
+		switch value.(type) {
+		case time.Time, *time.Time:
+		default:
+			tk := DereferenceValue(reflect.ValueOf(value))
+			if tk.Kind() == reflect.String {
+				return &FieldQryFormat{Field: "= ?", Value: []interface{}{singleValue.Interface()}}
+			}
+		}
+
+		if strings.Count(str, "..") == 1 {
+			v := strings.Split(str, "..")
+			return &FieldQryFormat{Field: "BETWEEN ? AND ?", Value: []interface{}{v[0], v[1]}}
+		}
+
+		if strings.Contains(str, ",") {
+			v := strings.Split(str, ",")
 			len := len(v)
-			if len > 2 {
-				return &fieldQryFormat{field: "IN (?)", v: []interface{}{v}}
-			} else if len == 2 {
+			if len >= 2 {
 				if v[0] == "" {
 					compare = "<="
 					singleValue = reflect.ValueOf(v[1])
@@ -547,10 +480,10 @@ func (field *FormField) toQuery() *fieldQryFormat {
 					compare = ">="
 					singleValue = reflect.ValueOf(v[0])
 				} else {
-					return &fieldQryFormat{field: "BETWEEN ? AND ?", v: []interface{}{v[0], v[1]}}
+					return &FieldQryFormat{Field: "IN (?)", Value: []interface{}{v}}
 				}
 			}
 		}
 	}
-	return &fieldQryFormat{field: fmt.Sprintf("%s ?", compare), v: []interface{}{singleValue.Interface()}}
+	return &FieldQryFormat{Field: fmt.Sprintf("%s ?", compare), Value: []interface{}{singleValue.Interface()}}
 }

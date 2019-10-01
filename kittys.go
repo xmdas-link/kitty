@@ -38,7 +38,7 @@ func (ks *kittys) parse() error {
 	for _, f := range ks.ModelStructs.Fields() {
 		k := f.Tag("kitty")
 		if strings.Contains(k, "bindresult") {
-			tk := (&FormField{f}).TypeAndKind()
+			tk := TypeKind(f)
 			ks.result = CreateModel(tk.ModelName) //NewModelStruct(tk.ModelName)
 			ks.multiResult = tk.TypeOfField.Kind() == reflect.Slice
 
@@ -98,8 +98,8 @@ func (ks *kittys) selects() []string {
 	}
 	return s
 }
-func (ks *kittys) joins() []*fieldQryFormat {
-	s := []*fieldQryFormat{}
+func (ks *kittys) joins() []*FieldQryFormat {
+	s := []*FieldQryFormat{}
 	for _, v := range ks.kittys {
 		if !v.Master {
 			s = append(s, v.joins(ks.ModelStructs, ks.get(v.JoinTo)))
@@ -108,8 +108,8 @@ func (ks *kittys) joins() []*fieldQryFormat {
 	return s
 }
 
-func (ks *kittys) where() []*fieldQryFormat {
-	s := []*fieldQryFormat{}
+func (ks *kittys) where() []*FieldQryFormat {
+	s := []*FieldQryFormat{}
 	if query := ks.ModelStructs.buildFormQuery(ks.master().TableName, ks.master().ModelName); len(query) > 0 {
 		s = append(s, query...)
 	}
@@ -118,7 +118,7 @@ func (ks *kittys) where() []*fieldQryFormat {
 			continue
 		}
 		if q := ks.ModelStructs.buildFormFieldQuery(bind.FieldName); q != nil {
-			q.field = bind.funcName() + " " + q.field
+			q.Field = bind.funcName() + " " + q.Field
 			s = append(s, q)
 		}
 	}
@@ -132,17 +132,17 @@ func (ks *kittys) groupby() []string {
 	}
 	return s
 }
-func (ks *kittys) having() *fieldQryFormat {
+func (ks *kittys) having() *FieldQryFormat {
 	for _, bind := range ks.binds {
 		if bind.Having {
 			if q := ks.ModelStructs.buildFormParamQuery(ks.result.Name(), bind.FieldName); q != nil {
-				q.field = bind.funcName() + " " + q.field
+				q.Field = bind.funcName() + " " + q.Field
 				// having 的统计是不是都应该是整型值？0917
-				for i, v := range q.v {
+				for i, v := range q.Value {
 					switch v.(type) {
 					case string:
 						x, _ := strconv.ParseInt(v.(string), 10, 64)
-						q.v[i] = reflect.ValueOf(x).Interface()
+						q.Value[i] = reflect.ValueOf(x).Interface()
 					}
 				}
 				return q //sum(xxx) > 50
@@ -152,7 +152,7 @@ func (ks *kittys) having() *fieldQryFormat {
 	return nil
 }
 
-func (ks *kittys) subWhere(model string) []*fieldQryFormat {
+func (ks *kittys) subWhere(model string) []*FieldQryFormat {
 	for _, bind := range ks.binds {
 		if bind.ModelName == ToCamel(model) {
 			if q := ks.ModelStructs.buildFormQuery(bind.TableName, bind.ModelName); q != nil {

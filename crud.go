@@ -3,7 +3,6 @@ package kitty
 import (
 	"fmt"
 
-	tagexpr "github.com/bytedance/go-tagexpr"
 	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/jinzhu/gorm"
 )
@@ -180,13 +179,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
-	if _, ok := s.FieldOk("ID"); ok {
-		vm := tagexpr.New("te")
-		r := vm.MustRun(s.raw)
-		if !r.Eval("ID").(bool) {
-			return nil, fmt.Errorf(r.Eval("ID@msg").(string))
-		}
-	}
 
 	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err

@@ -25,19 +25,12 @@ func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 		params:    param,
 		ctx:       c,
 	}
-	expr.params["s"] = s.raw
 	expr.init()
 	for _, f := range s.Fields() {
 		if getter := GetSub(f.Tag("kitty"), "getter"); len(getter) > 0 {
 			expr.f = f
-			res, err := expr.eval(getter)
-			if err != nil {
+			if err := expr.eval(getter); err != nil {
 				return err
-			}
-			if res != nil {
-				if err = s.SetFieldValue(f, res); err != nil {
-					return err
-				}
 			}
 		}
 	}
@@ -52,13 +45,12 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 		params:    param,
 		ctx:       c,
 	}
-	expr.params["s"] = s.raw
 	expr.init()
 	for _, f := range s.Fields() {
 		k := f.Tag("kitty")
 		if strings.Contains(k, "bindresult") {
-			tk := (&FormField{f}).TypeAndKind()
-			if tk.TypeOfField.Kind() == reflect.Slice {
+			tk := TypeKind(f)
+			if tk.KindOfField == reflect.Slice {
 				rv := reflect.ValueOf(f.Value())
 				len := rv.Len()
 				for i := 0; i < len; i++ {
@@ -68,7 +60,7 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 						return err
 					}
 				}
-			} else if tk.TypeOfField.Kind() == reflect.Struct {
+			} else if tk.KindOfField == reflect.Struct {
 				sdata := createModelStructs(f.Value())
 				if err := setter(sdata, param, db, c); err != nil {
 					return err
@@ -76,14 +68,8 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 			}
 		} else if setter := GetSub(k, "setter"); len(setter) > 0 {
 			expr.f = f
-			res, err := expr.eval(setter)
-			if err != nil {
+			if err := expr.eval(setter); err != nil {
 				return err
-			}
-			if res != nil {
-				if err = s.SetFieldValue(f, res); err != nil {
-					return err
-				}
 			}
 		}
 	}
@@ -126,9 +112,8 @@ func execqry(q qry, multi bool) (interface{}, error) {
 			res = reflect.ValueOf(res).Elem().Interface()
 		}
 	} else {
-		//res, err = q.one()
-		if res, err = q.one(); err == nil && res != nil {
-			res = reflect.ValueOf(res).Interface()
+		if res, err = q.one(); err != nil {
+			return nil, err
 		}
 	}
 	return res, err
