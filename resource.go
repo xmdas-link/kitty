@@ -16,7 +16,7 @@ type Resource struct {
 func NewResource(m interface{}) *Resource {
 	r := &Resource{
 		Model: m,
-		Strs:  createModelStructs(m),
+		Strs:  CreateModelStructs(m),
 	}
 	RegisterType(m)
 	r.ModelName = r.Strs.Name()

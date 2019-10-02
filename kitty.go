@@ -123,7 +123,7 @@ func (j *kitty) groupBy() []string {
 	return j.Group
 }
 
-func (j *kitty) joins(s *Structs, joinTo *kitty) *FieldQryFormat {
+func (j *kitty) joins(s *Structs, joinTo *kitty) *fieldQryFormat {
 	join := fmt.Sprintf("%s %s", j.JoinAction, j.TableName) // left join companies
 	where := []string{}
 	if len(j.JoinTo) > 0 {
@@ -142,11 +142,11 @@ func (j *kitty) joins(s *Structs, joinTo *kitty) *FieldQryFormat {
 	params := []interface{}{}
 	if query := s.buildFormQuery(j.TableName, j.ModelName); len(query) > 0 {
 		for _, v := range query {
-			where = append(where, v.Field)
-			params = append(params, v.Value...)
+			where = append(where, v.field)
+			params = append(params, v.value...)
 		}
 	}
 
-	qryformat := &FieldQryFormat{Field: fmt.Sprintf("%s ON %s", join, strings.Join(where, " AND ")), Value: params}
+	qryformat := &fieldQryFormat{field: fmt.Sprintf("%s ON %s", join, strings.Join(where, " AND ")), value: params}
 	return qryformat
 }

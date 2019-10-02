@@ -55,7 +55,7 @@ func RegisterType(v interface{}) {
 // CreateModel 通过名称创建模型
 func CreateModel(name string) *Structs {
 	if v := types[strcase.ToSnake(name)]; v != nil {
-		return createModelStructs(v.New())
+		return CreateModelStructs(v.New())
 	}
 	panic("")
 }

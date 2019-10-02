@@ -68,8 +68,8 @@ func (q *simpleQuery) update() error {
 	tx := q.db.Model(q.Result.raw)
 	if qryformat != nil {
 		//	return fmt.Errorf("unable update %s, not found param:id ", modelName)
-		w := fmt.Sprintf("ID %s", qryformat.Field)
-		tx = tx.Where(w, qryformat.Value...)
+		w := fmt.Sprintf("ID %s", qryformat.field)
+		tx = tx.Where(w, qryformat.value...)
 		whereCount++
 	}
 
@@ -93,8 +93,8 @@ func (q *simpleQuery) update() error {
 			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
 				field := ToCamel(v[1])
 				qryformat := q.ModelStructs.buildFormParamQueryCondition(modelName, field)
-				w := fmt.Sprintf("%s %s", v[1], qryformat.Field)
-				tx = tx.Where(w, qryformat.Value...)
+				w := fmt.Sprintf("%s %s", v[1], qryformat.field)
+				tx = tx.Where(w, qryformat.value...)
 				whereCount++
 			}
 		}

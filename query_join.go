@@ -14,19 +14,19 @@ type joinQuery struct {
 	ModelStructs *Structs
 	TableName    string
 	Selects      []string
-	Joins        []*FieldQryFormat
-	Where        []*FieldQryFormat
+	Joins        []*fieldQryFormat
+	Where        []*fieldQryFormat
 	GroupBy      []string
-	Having       *FieldQryFormat
+	Having       *fieldQryFormat
 }
 
 func (q *joinQuery) prepare() *gorm.DB {
 	tx := q.db.Table(q.TableName).Select(q.Selects)
 	for _, v := range q.Joins {
-		tx = tx.Joins(v.Field, v.Value...)
+		tx = tx.Joins(v.field, v.value...)
 	}
 	for _, v := range q.Where {
-		tx = tx.Where(v.Field, v.Value...)
+		tx = tx.Where(v.field, v.value...)
 	}
 	//for _, v := range q.GroupBy {
 	if len(q.GroupBy) > 0 {
@@ -34,7 +34,7 @@ func (q *joinQuery) prepare() *gorm.DB {
 	}
 	//}
 	if q.Having != nil {
-		tx = tx.Having(q.Having.Field, q.Having.Value...)
+		tx = tx.Having(q.Having.field, q.Having.value...)
 	}
 	return tx
 }

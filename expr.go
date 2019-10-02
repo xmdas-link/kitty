@@ -232,7 +232,7 @@ func (e *expr) init() {
 			if kk, ok := ks.(*kittys); ok {
 				if subqry := kk.subWhere(model); len(subqry) > 0 {
 					for _, v := range subqry {
-						tx = tx.Where(v.Field, v.Value...)
+						tx = tx.Where(v.field, v.value...)
 					}
 				}
 				j := kk.get(model)
@@ -287,7 +287,7 @@ func (e *expr) init() {
 							for i := 0; i < dslice.Len(); i++ {
 								screate := slices[i]
 								dv := dslice.Index(i)
-								ss := createModelStructs(dv.Interface())
+								ss := CreateModelStructs(dv.Interface())
 								for _, field := range ss.Fields() {
 									fname := field.Name()
 									if f, ok := screate.FieldOk(fname); ok {
@@ -471,12 +471,16 @@ var sectionFunc = func(s *Structs, curf *structs.Field, sectionExp string, param
 
 	keys := []string{"create_if", "update_if", "set_if", "vf", "rd_create_if", "rd_update_if"}
 	for _, k := range keys {
-		if strings.Contains(sectionExp, k) {
-			//create_if(result==1 && name==hello,'user_id=id,user_name=name')
+		if strings.HasPrefix(sectionExp, k) {
+			//create_if(result==1 && name==hello;'user_id=id,user_name=name')
+			//vf(len(split(this.name,','))==1;'error')
+			//rd_update_if(company!=nil,'department=company.name';'name=billgates')
 			a1 := strings.Index(sectionExp, "(")
-			b1 := strings.LastIndex(sectionExp, ",")
-			condition := sectionExp[a1+1 : b1] // result==1 && name==hello
+			b1 := strings.LastIndex(sectionExp, "?")
+			sectionExp = sectionExp[:b1] + string(",") + sectionExp[b1+1:]
+			condition := sectionExp[a1+1 : b1]                   // result==1 && name==hello
 			condition = strings.ReplaceAll(condition, ",", "$$") //等下要用，分割
+
 			key := []string{"&&", "==", "||", ">", ">=", "<", "<=", "!="}
 			for _, v := range key {
 				condition = strings.ReplaceAll(condition, v, ",")
@@ -484,6 +488,11 @@ var sectionFunc = func(s *Structs, curf *structs.Field, sectionExp string, param
 			key = strings.Split(condition, ",")
 			for _, v := range key {
 				fieldName := strings.ReplaceAll(v, "$$", ",") //替换回来
+				fieldName = strings.TrimPrefix(fieldName, " ")
+				fieldName = strings.TrimSuffix(fieldName, " ")
+				if len(fieldName) >= 2 && fieldName[0] == '\'' && fieldName[len(fieldName)-1] == '\'' {
+					continue // 'huang'
+				}
 				if len(fieldName) > 0 && hasLetter(fieldName) && fieldName != "nil" && params[fieldName] == nil {
 					if a := strings.Index(fieldName, "(this."); a > -1 { // len(this.name) / len(split(this.name,','))
 						b1 := strings.Index(fieldName[a+1:], ")")
@@ -538,6 +547,8 @@ func (e *expr) eval(expString string) error {
 	sections := strings.Split(strExpress, "|")
 	for _, section := range sections {
 		section = strings.ReplaceAll(section, "$$", "||")
+		section = strings.TrimPrefix(section, " ")
+		section = strings.TrimSuffix(section, " ")
 		setParam(e.f, "this", e.params)
 		section, err = sectionFunc(e.s, e.f, section, e.params)
 		if err != nil {

@@ -55,13 +55,13 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 				len := rv.Len()
 				for i := 0; i < len; i++ {
 					rvdata := rv.Index(i)
-					sdata := createModelStructs(rvdata.Interface())
+					sdata := CreateModelStructs(rvdata.Interface())
 					if err := setter(sdata, param, db, c); err != nil {
 						return err
 					}
 				}
 			} else if tk.KindOfField == reflect.Struct {
-				sdata := createModelStructs(f.Value())
+				sdata := CreateModelStructs(f.Value())
 				if err := setter(sdata, param, db, c); err != nil {
 					return err
 				}

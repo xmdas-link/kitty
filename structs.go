@@ -35,14 +35,14 @@ type StructFieldInfo struct {
 	Relationship          string //belongs_to has_one has_many
 }
 
-// FieldQryFormat 参数字段查询格式化
-type FieldQryFormat struct {
-	Field string
-	Value []interface{}
+// fieldQryFormat 参数字段查询格式化
+type fieldQryFormat struct {
+	field string
+	value []interface{}
 }
 
-// createModelStructs ...
-func createModelStructs(v interface{}) *Structs {
+// CreateModelStructs ...
+func CreateModelStructs(v interface{}) *Structs {
 	return &Structs{structs.New(v), v}
 }
 
@@ -174,8 +174,10 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 		if err != nil {
 			return err
 		}
-		if err := s.SetFieldValue(field, value); err != nil {
-			return err
+		if value != nil {
+			if err := s.SetFieldValue(field, value); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -214,12 +216,15 @@ func (s *Structs) getValue(param string) (interface{}, error) {
 			}
 			fieldvalue = slicevalue.Index(sliceIdx).Interface()
 		}
-		ss := createModelStructs(fieldvalue)
+		ss := CreateModelStructs(fieldvalue)
 		p := strings.Join(vv[1:], ".")
 		return ss.getValue(p)
 	}
 	param = strings.ReplaceAll(param, "`", "")
 	if f, ok := s.FieldOk(ToCamel(param)); ok {
+		if f.IsZero() {
+			return nil, nil
+		}
 		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 	}
 	return param, nil
@@ -274,11 +279,10 @@ func (s *Structs) ParseFormValues(values url.Values) error {
 			if formvalue, ok := values[formfield]; ok {
 				fk := TypeKind(field)
 				if fk.KindOfField == reflect.Slice {
-					if err := s.SetFieldValue(field, formvalue); err != nil {
+					if err := s.SetFieldValue(field, formvalue[:]); err != nil {
 						return err
 					}
-				}
-				if err := s.SetFieldValue(field, formvalue[0]); err != nil {
+				} else if err := s.SetFieldValue(field, formvalue[0]); err != nil {
 					return err
 				}
 			}
@@ -289,21 +293,21 @@ func (s *Structs) ParseFormValues(values url.Values) error {
 }
 
 // BuildFormQuery ...
-func (s *Structs) buildFormQuery(tblname, model string) []*FieldQryFormat {
+func (s *Structs) buildFormQuery(tblname, model string) []*fieldQryFormat {
 	withModel := strcase.ToSnake(model)
 	//	ss := NewModelStruct(withModel)
-	query := []*FieldQryFormat{}
+	query := []*fieldQryFormat{}
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel + "." //param:order_item.order_id
 		if k := field.Tag("kitty"); strings.Contains(k, bindParam) && !field.IsZero() {
 			bindField := strings.Split(GetSub(k, "param"), ".")[1]
-			if q := ToQuery(field); q != nil {
+			if q := formatQryParam(field); q != nil {
 				fname := strcase.ToSnake(bindField)
 				if len(tblname) > 0 {
-					q.Field = fmt.Sprintf("%s.%s %s", tblname, fname, q.Field)
+					q.field = fmt.Sprintf("%s.%s %s", tblname, fname, q.field)
 					//query = append(query, fmt.Sprintf("%s.%s %s", tblname, fname, q))
 				} else {
-					q.Field = fmt.Sprintf("%s %s", fname, q.Field)
+					q.field = fmt.Sprintf("%s %s", fname, q.field)
 					//query = append(query, fmt.Sprintf("%s %s", fname, q))
 				}
 				query = append(query, q)
@@ -314,16 +318,16 @@ func (s *Structs) buildFormQuery(tblname, model string) []*FieldQryFormat {
 }
 
 // BuildFormFieldQuery ....
-func (s *Structs) buildFormFieldQuery(fieldname string) *FieldQryFormat {
+func (s *Structs) buildFormFieldQuery(fieldname string) *fieldQryFormat {
 	FieldName := ToCamel(fieldname)
 	if field, ok := s.FieldOk(FieldName); ok && !field.IsZero() {
-		return ToQuery(field)
+		return formatQryParam(field)
 	}
 	return nil
 }
 
 // BuildFormParamQuery ....
-func (s *Structs) buildFormParamQuery(modelname, fieldname string) *FieldQryFormat {
+func (s *Structs) buildFormParamQuery(modelname, fieldname string) *fieldQryFormat {
 	withModel := strcase.ToSnake(modelname)
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel //param:order_item.order_id
@@ -332,10 +336,10 @@ func (s *Structs) buildFormParamQuery(modelname, fieldname string) *FieldQryForm
 			fname := strcase.ToSnake(fieldname)
 			if bindField == fname {
 				if strcase.ToSnake(field.Name()) == fname {
-					return ToQuery(field)
+					return formatQryParam(field)
 				}
 				//特殊的情况：当having的时候，form参数绑定的字段不是model的字段，而是兄弟字段
-				return ToQuery(field)
+				return formatQryParam(field)
 			}
 		}
 	}
@@ -343,7 +347,7 @@ func (s *Structs) buildFormParamQuery(modelname, fieldname string) *FieldQryForm
 }
 
 // BuildFormParamQuery ....
-func (s *Structs) buildFormParamQueryCondition(modelname, fieldname string) *FieldQryFormat {
+func (s *Structs) buildFormParamQueryCondition(modelname, fieldname string) *fieldQryFormat {
 	withModel := strcase.ToSnake(modelname)
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel //param:order_item.order_id
@@ -352,10 +356,10 @@ func (s *Structs) buildFormParamQueryCondition(modelname, fieldname string) *Fie
 			fname := strcase.ToSnake(fieldname)
 			if bindField == fname {
 				if strcase.ToSnake(field.Name()) == fname {
-					return ToQuery(field)
+					return formatQryParam(field)
 				}
 				//特殊的情况：当having的时候，form参数绑定的字段不是model的字段，而是兄弟字段
-				return ToQuery(field)
+				return formatQryParam(field)
 			}
 		}
 	}
@@ -420,9 +424,9 @@ func TypeKind(field *structs.Field) FieldTypeAndKind {
 	return TypeKind
 }
 
-// ToQuery 转成 形如 Where("name IN (?)", []string{"jinzhu", "jinzhu 2"})
+// formatQryParam 转成 形如 Where("name IN (?)", []string{"jinzhu", "jinzhu 2"})
 // having 需要完全的字段匹配
-func ToQuery(field *structs.Field) *FieldQryFormat {
+func formatQryParam(field *structs.Field) *fieldQryFormat {
 	typeKind := TypeKind(field)
 
 	if typeKind.KindOfField == reflect.Struct {
@@ -430,7 +434,7 @@ func ToQuery(field *structs.Field) *FieldQryFormat {
 	}
 	singleValue := DereferenceValue(reflect.ValueOf(field.Value()))
 	if typeKind.KindOfField == reflect.Slice {
-		return &FieldQryFormat{Field: "IN (?)", Value: []interface{}{singleValue.Interface()}}
+		return &fieldQryFormat{field: "IN (?)", value: []interface{}{singleValue.Interface()}}
 	}
 	compare := "="
 
@@ -442,7 +446,7 @@ func ToQuery(field *structs.Field) *FieldQryFormat {
 		fuzzyKey := []string{"%", "_", "["}
 		for _, v := range fuzzyKey {
 			if strings.Contains(str, v) {
-				return &FieldQryFormat{Field: "LIKE ?", Value: []interface{}{singleValue.Interface()}}
+				return &fieldQryFormat{field: "LIKE ?", value: []interface{}{singleValue.Interface()}}
 			}
 		}
 
@@ -460,13 +464,13 @@ func ToQuery(field *structs.Field) *FieldQryFormat {
 		default:
 			tk := DereferenceValue(reflect.ValueOf(value))
 			if tk.Kind() == reflect.String {
-				return &FieldQryFormat{Field: "= ?", Value: []interface{}{singleValue.Interface()}}
+				return &fieldQryFormat{field: "= ?", value: []interface{}{singleValue.Interface()}}
 			}
 		}
 
 		if strings.Count(str, "..") == 1 {
 			v := strings.Split(str, "..")
-			return &FieldQryFormat{Field: "BETWEEN ? AND ?", Value: []interface{}{v[0], v[1]}}
+			return &fieldQryFormat{field: "BETWEEN ? AND ?", value: []interface{}{v[0], v[1]}}
 		}
 
 		if strings.Contains(str, ",") {
@@ -480,10 +484,15 @@ func ToQuery(field *structs.Field) *FieldQryFormat {
 					compare = ">="
 					singleValue = reflect.ValueOf(v[0])
 				} else {
-					return &FieldQryFormat{Field: "IN (?)", Value: []interface{}{v}}
+					return &fieldQryFormat{field: "IN (?)", value: []interface{}{v}}
 				}
 			}
 		}
 	}
-	return &FieldQryFormat{Field: fmt.Sprintf("%s ?", compare), Value: []interface{}{singleValue.Interface()}}
+	return &fieldQryFormat{field: fmt.Sprintf("%s ?", compare), value: []interface{}{singleValue.Interface()}}
+}
+
+// FormatQryField for test
+func FormatQryField(field *structs.Field) string {
+	return formatQryParam(field).field
 }

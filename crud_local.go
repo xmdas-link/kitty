@@ -2,6 +2,7 @@ package kitty
 
 import (
 	"errors"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	jsoniter "github.com/json-iterator/go"
@@ -54,6 +55,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		nameAs := make(map[string][]string)
 		result := CrudResult{
 			Code: 1,
+			Ref:  time.Now().UnixNano() / 1e6,
 		}
 		if res != nil {
 			result.Data = res

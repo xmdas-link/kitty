@@ -40,11 +40,12 @@ func (crud *crud) queryObj() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+
+	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
 	}
 
-	if err := vd.Validate(s.raw); err != nil {
+	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -68,8 +69,11 @@ func (crud *crud) queryObj() (interface{}, error) {
 	if err != nil || res == nil {
 		return nil, err
 	}
-	if err = s.Field("Data").Set(res); err != nil {
-		return nil, err
+
+	if len(kittys.resultField) > 0 {
+		if err = s.Field(kittys.resultField).Set(res); err != nil {
+			return nil, err
+		}
 	}
 
 	params := make(map[string]interface{})
@@ -97,13 +101,15 @@ func (crud *crud) createObj() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
 
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
 	}
+
+	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+
 	kittys := &kittys{
 		ModelStructs: s,
 		db:           db,
@@ -149,8 +155,8 @@ func (crud *crud) createObj() (interface{}, error) {
 		f.Set(v.structs.raw)
 	}
 
-	if f, ok := s.FieldOk("Data"); ok {
-		if err := f.Set(res); err != nil {
+	if len(kittys.resultField) > 0 {
+		if err = s.Field(kittys.resultField).Set(res); err != nil {
 			return nil, err
 		}
 	}
@@ -180,11 +186,11 @@ func (crud *crud) updateObj() (interface{}, error) {
 		callbk = crud.callbk
 	)
 
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
 	}
 
-	if err := vd.Validate(s.raw); err != nil {
+	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
