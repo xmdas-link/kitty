@@ -24,7 +24,7 @@ func (q *simpleQuery) create() (interface{}, error) {
 	qryformats := q.ModelStructs.buildAllParamQuery()
 	for _, qry := range qryformats {
 		if modelName == qry.model {
-			if f, ok := q.Result.FieldOk(ToCamel(qry.fname)); ok {
+			if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
 				if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
 					return nil, err
 				}
@@ -73,7 +73,7 @@ func (q *simpleQuery) update() error {
 				whereCount++
 				w := qry.whereExpr()
 				tx = tx.Where(w, qry.value...)
-			} else if f, ok := q.Result.FieldOk(ToCamel(qry.fname)); ok {
+			} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
 				if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
 					return err
 				}
