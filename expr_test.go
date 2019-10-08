@@ -1,6 +1,7 @@
 package kitty_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -54,19 +55,40 @@ type Language struct {
 	UserID uint32
 }
 
+type UserResult struct {
+	Name       string
+	Department string
+}
+
 type Test struct {
 	UserSlice  []*User
+	UserResult []*UserResult
 	User1      *User
-	User       *User
+	User       *User 
 	Name       string
 	Age        int
 	Active     float64
 	UserName   string
 	Company    *Company
 	FindByName []string
+	Names      *interface{}
+	Ages       *interface{}
 }
 
+var db *gorm.DB
+
 func init() {
+	var err error
+	db, err = gorm.Open("sqlite3", "test.db")
+	if err != nil {
+		panic("failed to connect database")
+	}
+
+	db.LogMode(true)
+	db.AutoMigrate(&User{}, &Company{}, &CreditCard{}, &Language{})
+
+	db.Delete(&User{})
+	db.Delete(&Company{})
 	kitty.RegisterType(&Test{})
 	kitty.RegisterType(&User{})
 	kitty.RegisterType(&Company{})
@@ -74,18 +96,8 @@ func init() {
 	kitty.RegisterType(&Language{})
 }
 func TestExpr(t *testing.T) {
-	should := require.New(t)
-
-	db, err := gorm.Open("sqlite3", "test.db")
-	if err != nil {
-		panic("failed to connect database")
-	}
 	defer db.Close()
-	db.LogMode(true)
-	db.AutoMigrate(&User{}, &Company{}, &CreditCard{}, &Language{})
-
-	db.Delete(&User{})
-	db.Delete(&Company{})
+	should := require.New(t)
 
 	s := kitty.CreateModel("Test")
 
@@ -103,16 +115,106 @@ func TestExpr(t *testing.T) {
 	should.Error(kitty.Eval(s, db, s.Field("User1"), "vf(this.name== 'bill'?'name should huang')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User1"), "vf(this.age==10?'error iii')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(this==nil?'error')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=user1.name,age=user1.age,department=dev')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=user1.name,age=user1.age,department=dev')|vf(this.name=='huang'?'errorr')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='huang'?'name=`bill`,age=`20`,department=`sales`')|vf(this.name=='bill'?'errorr')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_update('name=`billgates`','name=bill')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Company"), "vf(company==nil?'error')|rd_create('name=oracle,job=hr,user_id=user.id')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(company!=nil?'error')|rd_update_if(company!=nil?'department=company.name','name=billgates')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()"))
 	should.Nil(kitty.Eval(s, db, s.Field("User1"), "f('user_slice[0]')|vf(this!=nil&&this.name=='huang'?'error')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd('name=huang')|vf(len(split(this.name,','))==1?'error')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rds('name=huang')|vf(len(split(this.name,','))==1?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "f('user.name')|vf(len(this)>0?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "set('hello,world')|vf(len(split(this,','))==2?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "db('user.department.id=user.id')|vf(this=='dev'?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Age"), "set_if(user_slice[0].name=='huang'?'99')|vf(this==99?'error')"))
+}
+func TestVf(t *testing.T) {
+	defer db.Close()
+	should := require.New(t)
+	s := kitty.CreateModel("Test")
+	s.Field("User1").Set(&User{})
+	s.Field("User1").Field("Name").Set("huang")
+	s.Field("User1").Field("Age").Set(10)
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
+	should.Error(kitty.Eval(s, db, s.Field("User1"), "vf(this.name== 'bill'?'name should huang')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User1"), "vf(this.age==10?'error iii')"))
+	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'error1')"))
+	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "vf(user_slice[1].name=='bill'?'error1')"))
+}
+
+func TestF(t *testing.T) {
+	defer db.Close()
+	should := require.New(t)
+	s := kitty.CreateModel("Test")
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("Name"), "f('user.name')|vf(len(this)>0?'error')"))
+	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'error1')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User1"), "f('user_slice[0]')|vf(this!=nil&&this.name=='huang'?'error')"))
+}
+
+func TestCreate(t *testing.T) {
+	defer db.Close()
+	should := require.New(t)
+	s := kitty.CreateModel("Test")
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='bill'?'name=`billgates`,age=`30`,department=`sales`')|vf(this.name=='billgates'?'errorr')"))
+}
+
+func TestRds(t *testing.T) {
+	defer db.Close()
+	should := require.New(t)
+	s := kitty.CreateModel("Test")
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
+	// 多条记录
+	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'error1')"))
+	// 单条记录
+	should.Nil(kitty.Eval(s, db, s.Field("User1"), "rds('name=bill')|vf(this.name=='bill'?'error2')"))
+	// scan到另外一个model
+	should.Nil(kitty.Eval(s, db, s.Field("UserResult"), "rds('','user.*')|vf(len(this)==2&&user_result[0].name=='huang'?'error1')"))
+	// 获取单列
+	should.Nil(kitty.Eval(s, db, s.Field("FindByName"), "rds('','user.name')|vf(len(this)==2?'error1')"))
+}
+func TestSet(t *testing.T) {
+	kitty.RegisterFunc("split", func(args ...interface{}) (interface{}, error) {
+		if args[0] == nil {
+			return nil, nil
+		}
+		return strings.Split(args[0].(string), args[1].(string)), nil
+	})
+	should := require.New(t)
+	s := kitty.CreateModel("Test")
+	should.Nil(kitty.Eval(s, db, s.Field("Name"), "set('hello,world')|vf(len(split(this,','))==2?'error')"))
+}
+
+func TestQryExpr(t *testing.T) {
+	defer db.Close()
+	should := require.New(t)
+	s := kitty.CreateModel("Test")
+
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
+	s.Field("Name").Set("bill%")
+	should.Nil(kitty.Eval(s, db, s.Field("Names"), "rds('name LIKE name','user.name')|vf(this!=nil?'err')"))
+	v := s.Field("Names").Value()
+	v = reflect.ValueOf(v).Elem().Interface()
+	var users []User
+	db.Select("*").Where("name IN (?)", v).Find(&users)
+	//	db.Select("*").Where("name IN (?)", db.
+	//		Select("name").Table("users").QueryExpr()).Find(&users)
+	should.Len(users, 1)
+
+	should.Nil(kitty.Eval(s, db, s.Field("Ages"), "rds('age>11,age<23','user.age')|vf(this!=nil?'err')"))
+
+	v = s.Field("Ages").Value()
+	v = reflect.ValueOf(v).Elem().Interface()
+	var users2 []User
+	db.Select("*").Where("age IN (?)", v).Find(&users2)
+	//	db.Select("*").Where("name IN (?)", db.
+	//		Select("name").Table("users").QueryExpr()).Find(&users)
+	should.Len(users2, 1)
+
 }

@@ -2,7 +2,8 @@ package kitty
 
 import (
 	"fmt"
-	"strings"
+
+	"github.com/iancoleman/strcase"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
@@ -18,14 +19,13 @@ type simpleQuery struct {
 }
 
 func (q *simpleQuery) create() (interface{}, error) {
-	modelName := q.Result.Name()
+	modelName := strcase.ToSnake(q.Result.Name())
 
-	for _, f := range q.ModelStructs.Fields() {
-		if k := f.Tag("kitty"); strings.Contains(k, "param:") && !f.IsZero() {
-			bindfield := GetSub(k, "param")
-			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
-				field := ToCamel(v[1])
-				if err := q.Result.SetFieldValue(q.Result.Field(field), f.Value()); err != nil {
+	qryformats := q.ModelStructs.buildAllParamQuery()
+	for _, qry := range qryformats {
+		if modelName == qry.model {
+			if f, ok := q.Result.FieldOk(ToCamel(qry.fname)); ok {
+				if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
 					return nil, err
 				}
 			}
@@ -63,39 +63,20 @@ func (q *simpleQuery) create() (interface{}, error) {
 func (q *simpleQuery) update() error {
 
 	whereCount := 0
-	modelName := q.Result.Name()
-	qryformat := q.ModelStructs.buildFormParamQuery(modelName, "ID")
+	modelName := strcase.ToSnake(q.Result.Name())
 	tx := q.db.Model(q.Result.raw)
-	if qryformat != nil {
-		//	return fmt.Errorf("unable update %s, not found param:id ", modelName)
-		w := fmt.Sprintf("ID %s", qryformat.field)
-		tx = tx.Where(w, qryformat.value...)
-		whereCount++
-	}
 
-	for _, f := range q.ModelStructs.Fields() {
-		if k := f.Tag("kitty"); strings.Contains(k, "param:") && !strings.Contains(k, "condition") && !f.IsZero() {
-			bindfield := GetSub(k, "param")
-			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
-				field := ToCamel(v[1])
-				if field == "ID" {
-					continue
-				}
-				if err := q.Result.SetFieldValue(q.Result.Field(field), f.Value()); err != nil {
+	qryformats := q.ModelStructs.buildAllParamQuery()
+	for _, qry := range qryformats {
+		if modelName == qry.model {
+			if qry.withCondition || ToCamel(qry.bindfield) == "ID" {
+				whereCount++
+				w := qry.whereExpr()
+				tx = tx.Where(w, qry.value...)
+			} else if f, ok := q.Result.FieldOk(ToCamel(qry.fname)); ok {
+				if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
 					return err
 				}
-			}
-		}
-	}
-	for _, f := range q.ModelStructs.Fields() {
-		if k := f.Tag("kitty"); strings.Contains(k, "param:") && strings.Contains(k, "condition") && !f.IsZero() {
-			bindfield := GetSub(k, "param")
-			if v := strings.Split(bindfield, "."); len(v) == 2 && ToCamel(v[0]) == modelName {
-				field := ToCamel(v[1])
-				qryformat := q.ModelStructs.buildFormParamQueryCondition(modelName, field)
-				w := fmt.Sprintf("%s %s", v[1], qryformat.field)
-				tx = tx.Where(w, qryformat.value...)
-				whereCount++
 			}
 		}
 	}

@@ -13,18 +13,13 @@ type fieldBinding struct {
 	TableName      string // users companies
 	FieldName      string // UserName
 	BindModelField string // Name
-	Func           string // count / sum
 	Format         string // 字段格式化 strftime('%s',$);     -->结果：1525478400
-	Having         bool
 }
 
 func (f *fieldBinding) selectAs() string {
 	if len(f.Format) > 0 {
 		format := strings.Replace(f.Format, "$", f.tableWithFieldName(), -1)
 		return fmt.Sprintf("%s AS %s", format, strcase.ToSnake(f.FieldName))
-	}
-	if len(f.Func) > 0 {
-		return fmt.Sprintf("%s(%s) AS %s", f.Func, f.tableWithFieldName(), strcase.ToSnake(f.FieldName))
 	}
 	if f.BindModelField == "*" {
 		return fmt.Sprintf("%s", f.tableWithFieldName())
@@ -44,8 +39,8 @@ func (f *fieldBinding) tableWithFieldName() string {
 }
 
 func (f *fieldBinding) funcName() string { //sum(xx)
-	if len(f.Func) > 0 {
-		return fmt.Sprintf("%s(%s)", f.Func, f.tableWithFieldName())
+	if len(f.Format) > 0 {
+		return strings.Replace(f.Format, "$", f.tableWithFieldName(), -1)
 	}
 	return f.tableWithFieldName()
 }
@@ -68,8 +63,8 @@ func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding
 	if len(j.TableName) == 0 {
 		j.ModelName = modelName
 		j.FieldName = fieldName
-		j.structs = CreateModel(modelName)                             //NewModelStruct(modelName)                                   // OrderItem
-		j.TableName = db.NewScope(j.structs.raw).GetModelStruct().TableName(db) //order_items
+		j.structs = CreateModel(modelName)                   //NewModelStruct(modelName)                                   // OrderItem
+		j.TableName = db.NewScope(j.structs.raw).TableName() //order_items
 	}
 
 	if s := GetSub(k, "bind"); len(s) > 0 {
@@ -77,11 +72,9 @@ func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding
 		binding := &fieldBinding{
 			ModelName:      modelName,
 			TableName:      j.TableName,
-			Func:           strings.ToUpper(GetSub(k, "func")),
 			Format:         GetSub(k, "format"),
 			BindModelField: modelField[1],
 			FieldName:      strcase.ToSnake(fieldName),
-			Having:         strings.Contains(k, "having"),
 		}
 		return binding
 	}
@@ -95,31 +88,7 @@ func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding
 	return nil
 }
 
-// model.name -> company_name
-func (j *kitty) fieldName(bindField string) string {
-	//	for _, v := range j.fieldBind {
-	//		if v.BindModelField == bindField {
-	//			return v.FieldName
-	//		}
-	//	}
-	return fmt.Sprintf("%s.%s", j.TableName, bindField)
-}
-
-/*func (j *kitty) selectAs() []string {
-	s := []string{}
-	for _, bind := range j.fieldBind {
-		s = append(s, bind.SelectAs())
-	}
-	return s
-}*/
 func (j *kitty) groupBy() []string {
-	//	s := []string{}
-	//	if len(j.Group) > 0 {
-	//		for _, v := range j.Group {
-	//			s = append(s, j.fieldName(v))
-	//		}
-	//	}
-	//	return s
 	return j.Group
 }
 
@@ -142,11 +111,11 @@ func (j *kitty) joins(s *Structs, joinTo *kitty) *fieldQryFormat {
 	params := []interface{}{}
 	if query := s.buildFormQuery(j.TableName, j.ModelName); len(query) > 0 {
 		for _, v := range query {
-			where = append(where, v.field)
+			where = append(where, v.operator)
 			params = append(params, v.value...)
 		}
 	}
 
-	qryformat := &fieldQryFormat{field: fmt.Sprintf("%s ON %s", join, strings.Join(where, " AND ")), value: params}
+	qryformat := &fieldQryFormat{operator: fmt.Sprintf("%s ON %s", join, strings.Join(where, " AND ")), value: params}
 	return qryformat
 }

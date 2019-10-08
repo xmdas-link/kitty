@@ -4,11 +4,14 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/iancoleman/strcase"
+
 	"github.com/Knetic/govaluate"
 	"github.com/jinzhu/gorm"
 )
 
 type qry interface {
+	prepare() *gorm.DB
 	multi() (interface{}, error)
 	one() (interface{}, error)
 }
@@ -76,8 +79,9 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 	return nil
 }
 
-func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) (interface{}, error) {
-	joinqry := &joinQuery{
+func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) qry {
+	kittys.prepare()
+	return &joinQuery{
 		db:           db,
 		search:       search,
 		ModelStructs: kittys.result,
@@ -88,18 +92,29 @@ func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) 
 		GroupBy:      kittys.groupby(),
 		Having:       kittys.having(),
 	}
-	return execqry(joinqry, kittys.multiResult)
+	//return execqry(joinqry, kittys.multiResult)
 }
 
-func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) (interface{}, error) {
-	Master := kittys.master()
-	qry := &query{
+func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) qry {
+	modelName := strcase.ToSnake(kittys.master().ModelName)
+	var qryformats []*fieldQryFormat
+	for _, v := range s.buildAllParamQuery() {
+		if v.model == modelName {
+			qryformats = append(qryformats, v)
+		}
+	}
+
+	q := &query{
 		db:           db,
 		search:       search,
 		ModelStructs: kittys.result,
-		queryString:  s.buildFormQuery(Master.TableName, Master.ModelName),
+		queryString:  qryformats,
 	}
-	return execqry(qry, kittys.multiResult)
+	if len(kittys.binds) > 0 && kittys.binds[0] != nil {
+		q.fieldselect = kittys.binds[0].BindModelField
+	}
+	return q
+	//	return execqry(qry, kittys.multiResult)
 }
 
 func execqry(q qry, multi bool) (interface{}, error) {

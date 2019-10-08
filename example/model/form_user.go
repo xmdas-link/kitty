@@ -8,7 +8,7 @@ type FormCreateUser struct {
 	Age                *string  `json:"-" kitty:"param:user.age;"`
 	Department         *string  `json:"-" kitty:"param:user.department;"`
 	Salary             *float64 `json:"-" kitty:"param:user.salary;" vd:"$>0.0;msg:'salary is zero.'"`
-	TestNameDumplicate *User    `json:"-" kitty:"getter:rd('name=name')|vf(this==nil?'name duplicate')"`
+	TestNameDumplicate *User    `json:"-" kitty:"getter:rds('name=name')|vf(this==nil?'name duplicate')"`
 	MUser              User     `json:"-" kitty:"master"`
 }
 
@@ -18,8 +18,8 @@ type FormUpdateUser struct {
 	Name               *string `json:"-" kitty:"param:user.name;"`
 	Age                *string `json:"-" kitty:"param:user.age;"`
 	Department         *string `json:"-" kitty:"param:user.department;"`
-	TestID             *User   `json:"-" kitty:"getter:rd('id=id')|vf(this!=nil?'id not exist')"`
-	TestNameDumplicate *User   `json:"-" kitty:"getter:rd('name=name')|vf(this==nil||this.id==id?'name duplicate')"`
+	TestID             *User   `json:"-" kitty:"getter:rds('id=id')|vf(this!=nil?'id not exist')"`
+	TestNameDumplicate *User   `json:"-" kitty:"getter:rds('name=name')|vf(this==nil||this.id==id?'name duplicate')"`
 	User               User    `json:"-" kitty:"master"`
 }
 
@@ -37,7 +37,7 @@ type FormUser struct {
 // 规则：
 type FormUserList struct {
 	List       []*User `kitty:"bind:user.*;bindresult;"`
-	Name       *string `json:"-" kitty:"param:user.name;"`
+	Name       []string `json:"-" kitty:"param:user.name;"`
 	CreateTime *string `json:"-" kitty:"param:user.created_at;"`
 	Department *string `json:"-" kitty:"param:user.department;"`
 	User       User    `json:"-" kitty:"master"`

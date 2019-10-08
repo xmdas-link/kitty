@@ -3,8 +3,9 @@ package kitty
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
+
+	"github.com/iancoleman/strcase"
 
 	"github.com/jinzhu/gorm"
 )
@@ -18,6 +19,7 @@ type kittys struct {
 	result       *Structs
 	resultField  string
 	multiResult  bool
+	qryFormats   []*fieldQryFormat
 }
 
 // Parse ...
@@ -42,7 +44,7 @@ func (ks *kittys) parse() error {
 			ks.resultField = f.Name()
 			tk := TypeKind(f)
 			ks.result = CreateModel(tk.ModelName) //NewModelStruct(tk.ModelName)
-			ks.multiResult = tk.TypeOfField.Kind() == reflect.Slice
+			ks.multiResult = tk.KindOfField == reflect.Slice
 
 			if kkkk := ks.get(tk.ModelName); kkkk != nil {
 				binding := kkkk.parse(k, tk.ModelName, f.Name(), ks.db)
@@ -93,6 +95,21 @@ func (ks *kittys) get(modelname string) *kitty {
 	}
 	return nil
 }
+
+func (ks *kittys) prepare() {
+	ks.qryFormats = ks.ModelStructs.buildAllParamQuery()
+
+	if ks.result != nil {
+		for _, v := range ks.qryFormats {
+			if f, ok := ks.result.FieldOk(ToCamel(v.bindfield)); ok {
+				if k := f.Tag("kitty"); strings.Contains(k, "format") {
+					v.format = GetSub(k, "format")
+				}
+			}
+		}
+	}
+}
+
 func (ks *kittys) selects() []string {
 	s := []string{}
 	for _, v := range ks.binds {
@@ -100,6 +117,7 @@ func (ks *kittys) selects() []string {
 	}
 	return s
 }
+
 func (ks *kittys) joins() []*fieldQryFormat {
 	s := []*fieldQryFormat{}
 	for _, v := range ks.kittys {
@@ -112,16 +130,29 @@ func (ks *kittys) joins() []*fieldQryFormat {
 
 func (ks *kittys) where() []*fieldQryFormat {
 	s := []*fieldQryFormat{}
-	if query := ks.ModelStructs.buildFormQuery(ks.master().TableName, ks.master().ModelName); len(query) > 0 {
-		s = append(s, query...)
-	}
-	for _, bind := range ks.binds {
-		if bind.Having { //过滤having字段
-			continue
+
+	masterModel := strcase.ToSnake(ks.master().ModelName)
+	tblname := strcase.ToSnake(ks.master().TableName)
+	for _, v := range ks.qryFormats {
+		if masterModel == v.model && len(v.format) == 0 { // 带有format 约束的，放入having
+			s = append(s, &fieldQryFormat{
+				operator: fmt.Sprintf("%s.%s %s", tblname, v.bindfield, v.operator),
+				value:    v.value,
+			})
 		}
-		if q := ks.ModelStructs.buildFormFieldQuery(bind.FieldName); q != nil {
-			q.field = bind.funcName() + " " + q.field
-			s = append(s, q)
+	}
+
+	for _, v := range ks.qryFormats {
+		if len(v.format) == 0 {
+			for _, bind := range ks.binds {
+				fname := strcase.ToSnake(bind.FieldName)
+				if fname == v.fname {
+					s = append(s, &fieldQryFormat{
+						operator: fmt.Sprintf("%s %s", bind.funcName(), v.operator),
+						value:    v.value,
+					})
+				}
+			}
 		}
 	}
 	return s
@@ -134,24 +165,14 @@ func (ks *kittys) groupby() []string {
 	}
 	return s
 }
-func (ks *kittys) having() *fieldQryFormat {
-	for _, bind := range ks.binds {
-		if bind.Having {
-			if q := ks.ModelStructs.buildFormParamQuery(ks.result.Name(), bind.FieldName); q != nil {
-				q.field = bind.funcName() + " " + q.field
-				// having 的统计是不是都应该是整型值？0917
-				for i, v := range q.value {
-					switch v.(type) {
-					case string:
-						x, _ := strconv.ParseInt(v.(string), 10, 64)
-						q.value[i] = reflect.ValueOf(x).Interface()
-					}
-				}
-				return q //sum(xxx) > 50
-			}
+func (ks *kittys) having() []*fieldQryFormat {
+	s := []*fieldQryFormat{}
+	for _, v := range ks.qryFormats {
+		if len(v.format) > 0 { // 带有format 约束的，放入having
+			s = append(s, v)
 		}
 	}
-	return nil
+	return s
 }
 
 func (ks *kittys) subWhere(model string) []*fieldQryFormat {

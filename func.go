@@ -150,3 +150,9 @@ func init() {
 func RegisterFunc(name string, func1 govaluate.ExpressionFunction) {
 	exprFuncs[name] = func1
 }
+
+func trimSpace(s string) string {
+	s = strings.TrimPrefix(s, " ")
+	s = strings.TrimSuffix(s, " ")
+	return s
+}

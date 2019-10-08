@@ -162,10 +162,12 @@ func (e *expr) init() {
 		if err := ss.fillValue(e.s, v); err != nil {
 			return nil, err
 		}
-		if db.Create(ss.raw).Error == nil {
+
+		err := db.Create(ss.raw).Error
+		if err == nil {
 			return ss.raw, nil
 		}
-		return nil, nil
+		return nil, err
 	}
 
 	//更新单条记录  格式  update:xx=xx, where: xx=xx
@@ -194,37 +196,62 @@ func (e *expr) init() {
 		return nil, nil
 	}
 
-	// rd 单条记录 -> 模型
-	functions["rd"] = func(args ...interface{}) (interface{}, error) {
-		db := e.db
-		argv := args[0].(string)
-		v := strings.Split(argv, ",")
-
-		model := TypeKind(e.f).ModelName
-		ss := CreateModel(model)
-		if err := ss.fillValue(e.s, v); err != nil {
-			return nil, err
-		}
-		if db.Where(ss.raw).First(ss.raw).Error == nil {
-			return ss.raw, nil
-		}
-		return nil, nil
-	}
-
+	// rds:  rds('key=value','user.field,field') 第二项不是必填项。
+	// 当kitty字段不是gorm的时候，需声明第二项
 	functions["rds"] = func(args ...interface{}) (interface{}, error) {
 		s := e.s
-		db := e.db
-		tx := db
-
+		tx := e.db
 		tk := TypeKind(e.f)
 		model := tk.ModelName
+		modelDeclared := false
+		fieldSel := ""
+
+		if len(args) == 2 {
+			fieldSel = args[1].(string)
+			if strings.Contains(fieldSel, ".") {
+				v := strings.Split(fieldSel, ".")
+				model = v[0]
+				fieldSel = v[1]
+				modelDeclared = true
+			}
+			if len(fieldSel) > 0 {
+				tx = tx.Select(fieldSel)
+			}
+		}
+
 		ss := CreateModel(model)
 
 		if len(args) > 0 { // 参数查询 product_id = product.id
 			argv := args[0].(string)
-			v := strings.Split(argv, ",")
-			if err := ss.fillValue(e.s, v); err != nil {
-				return nil, err
+			if len(argv) > 0 {
+				v := strings.Split(argv, ",")
+				if len(v) > 0 {
+					for _, expression := range v {
+						operators := []string{" LIKE ", "<>", ">", ">=", "<", "<="}
+
+						has := false
+						for _, oper := range operators {
+							if strings.Contains(expression, oper) {
+								vv := strings.Split(expression, oper)
+								has = true
+								param := trimSpace(vv[1])
+								res, err := s.getValue(param)
+								if err != nil {
+									return nil, err
+								}
+								fname := strcase.ToSnake(trimSpace(vv[0]))
+								tx = tx.Where(fmt.Sprintf("%s %s ?", fname, oper), res)
+								break
+							}
+						}
+						if !has {
+							if err := ss.fillValue(e.s, []string{expression}); err != nil {
+								return nil, err
+							}
+							tx = tx.Where(ss.raw)
+						}
+					}
+				}
 			}
 		}
 
@@ -232,7 +259,7 @@ func (e *expr) init() {
 			if kk, ok := ks.(*kittys); ok {
 				if subqry := kk.subWhere(model); len(subqry) > 0 {
 					for _, v := range subqry {
-						tx = tx.Where(v.field, v.value...)
+						tx = tx.Where(v.operator, v.value...)
 					}
 				}
 				j := kk.get(model)
@@ -249,19 +276,55 @@ func (e *expr) init() {
 				}
 			}
 		}
+		//	tx = tx.Where(ss.raw)
 
-		if tk.TypeOfField.Kind() == reflect.Struct {
-			if tx.Where(ss.raw).First(ss.raw).Error == nil {
-				return ss.raw, nil
+		var err error
+		var res interface{}
+
+		switch tk.TypeOfField.Kind() {
+		case reflect.Struct:
+			if len(args) == 2 && modelDeclared {
+				tx = tx.Model(ss.raw)
+				result := CreateModel(TypeKind(e.f).ModelName)
+				err = tx.Scan(result.raw).Error
+				res = result.raw
+			} else {
+				err = tx.First(ss.raw).Error
+				res = ss.raw
 			}
-		} else if tk.TypeOfField.Kind() == reflect.Slice {
-			objValue := makeSlice(reflect.TypeOf(ss.raw), 0)
-			if tx.Where(ss.raw).Find(objValue.Interface()).Error == nil {
-				return objValue.Elem().Interface(), nil
+			if err != nil {
+				return nil, nil
 			}
+		case reflect.Slice: // like []UserResult []string
+			if len(args) == 2 && modelDeclared {
+				tx = tx.Model(ss.raw)
+				rt := DereferenceType(tk.TypeOfField.Elem())
+				if rt.Kind() == reflect.Struct {
+					result := CreateModel(tk.ModelName)
+					objValue := makeSlice(reflect.TypeOf(result.raw), 0)
+					err = tx.Scan(objValue.Interface()).Error
+					res = objValue.Elem().Interface()
+				} else {
+					if rt.Kind() >= reflect.Int && rt.Kind() <= reflect.Float64 || rt.Kind() == reflect.String {
+						objValue := makeSlice(tk.TypeOfField, 0)
+						err = tx.Pluck(fieldSel, objValue.Interface()).Error
+						res = objValue.Elem().Interface()
+					}
+				}
+
+			} else {
+				objValue := makeSlice(reflect.TypeOf(ss.raw), 0)
+				err = tx.Find(objValue.Interface()).Error
+				res = objValue.Elem().Interface()
+			}
+		case reflect.Interface:
+			tx = tx.Model(ss.raw)
+			pi := new(interface{})
+			*pi = tx.QueryExpr()
+			return nil, e.f.Set(pi)
 		}
 
-		return nil, nil
+		return res, err
 	}
 
 	var batchCreate = func(s *Structs, args ...interface{}) (interface{}, error) {
@@ -360,7 +423,14 @@ func (e *expr) init() {
 
 	var f1 = func(field *structs.Field, args ...interface{}) (*Structs, error) {
 		tk := TypeKind(field)
-		strs := CreateModel(tk.ModelName)
+		model := tk.ModelName
+		if len(args) == 2 {
+			m := args[1].(string)
+			if len(m) > 0 {
+				model = args[1].(string)
+			}
+		}
+		strs := CreateModel(model)
 		params := strings.Split(args[0].(string), ",")
 		return strs, strs.fillValue(e.s, params)
 	}
@@ -371,12 +441,23 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		return newcrud(&config{
+		q := newcrud(&config{
 			strs:   strs,
 			search: &SearchCondition{},
 			db:     e.db,
 			ctx:    e.ctx,
-		}).queryObj()
+		})
+
+		if TypeKind(e.f).KindOfField == reflect.Interface {
+			res, err := q.queryExpr()
+			if err != nil {
+				return nil, err
+			}
+			pi := new(interface{})
+			*pi = res
+			return nil, e.f.Set(pi)
+		}
+		return q.queryObj()
 	}
 
 	functions["create_if"] = func(args ...interface{}) (interface{}, error) {
@@ -447,6 +528,9 @@ func (e *expr) init() {
 }
 
 var setParam = func(f *structs.Field, name string, params map[string]interface{}) {
+	if f.Kind() == reflect.Interface {
+		return
+	}
 	if f.IsZero() {
 		if reflect.TypeOf(f.Value()).Kind() == reflect.Ptr {
 			params[name] = nil
@@ -488,8 +572,7 @@ var sectionFunc = func(s *Structs, curf *structs.Field, sectionExp string, param
 			key = strings.Split(condition, ",")
 			for _, v := range key {
 				fieldName := strings.ReplaceAll(v, "$$", ",") //替换回来
-				fieldName = strings.TrimPrefix(fieldName, " ")
-				fieldName = strings.TrimSuffix(fieldName, " ")
+				fieldName = trimSpace(fieldName)
 				if len(fieldName) >= 2 && fieldName[0] == '\'' && fieldName[len(fieldName)-1] == '\'' {
 					continue // 'huang'
 				}
@@ -547,8 +630,7 @@ func (e *expr) eval(expString string) error {
 	sections := strings.Split(strExpress, "|")
 	for _, section := range sections {
 		section = strings.ReplaceAll(section, "$$", "||")
-		section = strings.TrimPrefix(section, " ")
-		section = strings.TrimSuffix(section, " ")
+		section = trimSpace(section)
 		setParam(e.f, "this", e.params)
 		section, err = sectionFunc(e.s, e.f, section, e.params)
 		if err != nil {

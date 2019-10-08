@@ -17,24 +17,24 @@ type joinQuery struct {
 	Joins        []*fieldQryFormat
 	Where        []*fieldQryFormat
 	GroupBy      []string
-	Having       *fieldQryFormat
+	Having       []*fieldQryFormat
 }
 
 func (q *joinQuery) prepare() *gorm.DB {
 	tx := q.db.Table(q.TableName).Select(q.Selects)
 	for _, v := range q.Joins {
-		tx = tx.Joins(v.field, v.value...)
+		tx = tx.Joins(v.operator, v.value...)
 	}
 	for _, v := range q.Where {
-		tx = tx.Where(v.field, v.value...)
+		tx = tx.Where(v.whereExpr(), v.value...)
 	}
 	//for _, v := range q.GroupBy {
 	if len(q.GroupBy) > 0 {
 		tx = tx.Group(strings.Join(q.GroupBy, ", "))
 	}
 	//}
-	if q.Having != nil {
-		tx = tx.Having(q.Having.field, q.Having.value...)
+	for _, v := range q.Having {
+		tx = tx.Having(v.whereExpr(), v.value...)
 	}
 	return tx
 }

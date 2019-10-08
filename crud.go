@@ -31,6 +31,38 @@ type crud struct {
 func newcrud(conf *config) *crud {
 	return &crud{conf}
 }
+func (crud *crud) queryExpr() (interface{}, error) {
+	var (
+		s      = crud.strs
+		search = crud.search
+		db     = crud.db
+		c      = crud.ctx
+	)
+
+	if err := vd.Validate(s.raw); err != nil {
+		return nil, err
+	}
+
+	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+
+	kittys := &kittys{
+		ModelStructs: s,
+		db:           db,
+	}
+	if err := kittys.parse(); err != nil {
+		return nil, err
+	}
+
+	var qry qry
+	if len(kittys.kittys) > 1 {
+		qry = evalJoin(s, kittys, search, db)
+	} else {
+		qry = evalSimpleQry(s, kittys, search, db)
+	}
+	return qry.prepare().QueryExpr(), nil
+}
 
 func (crud *crud) queryObj() (interface{}, error) {
 	var (
@@ -56,16 +88,19 @@ func (crud *crud) queryObj() (interface{}, error) {
 	if err := kittys.parse(); err != nil {
 		return nil, err
 	}
+
+	var qry qry
+	if len(kittys.kittys) > 1 {
+		qry = evalJoin(s, kittys, search, db)
+	} else {
+		qry = evalSimpleQry(s, kittys, search, db)
+	}
+
 	var (
 		res interface{}
 		err error
 	)
-
-	if len(kittys.kittys) > 1 {
-		res, err = evalJoin(s, kittys, search, db)
-	} else {
-		res, err = evalSimpleQry(s, kittys, search, db)
-	}
+	res, err = execqry(qry, kittys.multiResult)
 	if err != nil || res == nil {
 		return nil, err
 	}
