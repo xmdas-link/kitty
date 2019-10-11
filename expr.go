@@ -179,11 +179,7 @@ func (e *expr) init() {
 		model := TypeKind(e.f).ModelName
 		sUpdate := CreateModel(model)
 		//	sWhere := CreateModel(model)
-
-		vUpdate := strings.Split(updateCondition, ",")
-		if err := sUpdate.fillValue(e.s, vUpdate); err != nil {
-			return nil, err
-		}
+		tx = tx.Model(sUpdate.raw)
 
 		vWhere := strings.Split(whereCondition, ",")
 		for _, expression := range vWhere {
@@ -204,13 +200,36 @@ func (e *expr) init() {
 			}
 		}
 
+		updates := make(map[string]interface{})
+
+		vUpdate := strings.Split(updateCondition, ",")
+		if err := sUpdate.fillValue(e.s, vUpdate); err != nil {
+			return nil, err
+		}
+		for _, expression := range vUpdate {
+			if strings.Contains(expression, "=") {
+				vv := strings.Split(expression, "=")
+				param := trimSpace(vv[1])
+				res, err := e.s.getValue(param)
+				if err != nil {
+					return nil, err
+				}
+				fname := strcase.ToSnake(trimSpace(vv[0]))
+				updates[fname] = res
+			}
+		}
+
+		if err := tx.Updates(updates).Error; err != nil {
+			return nil, err
+		}
+
 		//		if err := sWhere.fillValue(e.s, vWhere); err != nil {
 		//			return nil, err
 		//		}
 
-		if err := tx.Model(CreateModel(model).raw).Updates(sUpdate.raw).Error; err != nil {
-			return nil, err
-		}
+		//if err := tx.Model(CreateModel(model).raw).Updates(sUpdate.raw).Error; err != nil {
+		//	return nil, err
+		//}
 		return nil, nil
 	}
 

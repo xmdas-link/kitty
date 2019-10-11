@@ -103,7 +103,7 @@ func TestExpr(t *testing.T) {
 
 	s.Field("User1").Set(&User{})
 	s.Field("User1").Field("Name").Set("huang")
-	s.Field("User1").Field("Age").Set(10)
+	s.Field("User1").Field("Age").Set(uint(10))
 
 	kitty.RegisterFunc("split", func(args ...interface{}) (interface{}, error) {
 		if args[0] == nil {
@@ -120,7 +120,7 @@ func TestExpr(t *testing.T) {
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(this==nil?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=user1.name,age=user1.age,department=dev')|vf(this.name=='huang'?'errorr')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='huang'?'name=`bill`,age=`20`,department=`sales`')|vf(this.name=='bill'?'errorr')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_update('name=`billgates`','name=bill')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_update('name=`billgates`,age=0','name=bill')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Company"), "vf(company==nil?'error')|rd_create('name=oracle,job=hr,user_id=user.id')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(company!=nil?'error')|rd_update_if(company!=nil?'department=company.name','name=billgates')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()"))
