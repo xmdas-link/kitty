@@ -203,9 +203,6 @@ func (e *expr) init() {
 		updates := make(map[string]interface{})
 
 		vUpdate := strings.Split(updateCondition, ",")
-		if err := sUpdate.fillValue(e.s, vUpdate); err != nil {
-			return nil, err
-		}
 		for _, expression := range vUpdate {
 			if strings.Contains(expression, "=") {
 				vv := strings.Split(expression, "=")
