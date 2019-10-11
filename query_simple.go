@@ -66,6 +66,8 @@ func (q *simpleQuery) update() error {
 	modelName := strcase.ToSnake(q.Result.Name())
 	tx := q.db.Model(q.Result.raw)
 
+	updates := make(map[string]interface{})
+
 	qryformats := q.ModelStructs.buildAllParamQuery()
 	for _, qry := range qryformats {
 		if modelName == qry.model {
@@ -73,17 +75,19 @@ func (q *simpleQuery) update() error {
 				whereCount++
 				w := qry.whereExpr()
 				tx = tx.Where(w, qry.value...)
-			} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
-				if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
-					return err
-				}
+			} else if _, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
+				//if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
+				//	return err
+				//}
+				updates[qry.bindfield] = qry.value[0]
 			}
 		}
 	}
 	if whereCount == 0 {
 		return fmt.Errorf("unable update %s, missing query condition", modelName)
 	}
-	tx = tx.Update(q.Result.raw)
+	//tx = tx.Update(q.Result.raw)
+	tx = tx.Updates(updates)
 
 	if err := tx.Error; err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
