@@ -86,11 +86,7 @@ func pages(db *gorm.DB, search *SearchCondition, result interface{}, scan bool) 
 
 		total := 0
 		if scan {
-			tx = tx.Raw("select count(*) from (?) tmp", tx.QueryExpr()).Count(&total)
-			//	rows, _ := tx.Rows()
-			//	for rows.Next() {
-			//		total++
-			//	}
+			db.New().Raw("select count(*) from (?) ", tx.QueryExpr()).Count(&total)
 		} else {
 			tx = tx.Count(&total)
 		}
