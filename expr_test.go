@@ -17,7 +17,7 @@ type User struct {
 	CreatedAt  time.Time `json:"created_at,omitempty"`
 	UpdatedAt  time.Time `json:"updated_at,omitempty"`
 	Name       string    `gorm:"UNIQUE_INDEX" form:"type:text;" permission:"rw:admin; r:api" json:"name,omitempty"`
-	Age        int       `json:"age,omitempty"`
+	Age        uint      `json:"age,omitempty"`
 	Department string
 	Manager    int
 	Birthday   time.Time
@@ -64,7 +64,7 @@ type Test struct {
 	UserSlice  []*User
 	UserResult []*UserResult
 	User1      *User
-	User       *User 
+	User       *User
 	Name       string
 	Age        int
 	Active     float64
@@ -111,9 +111,12 @@ func TestExpr(t *testing.T) {
 		}
 		return strings.Split(args[0].(string), args[1].(string)), nil
 	})
+	kitty.RegisterFunc("test", func(args ...interface{}) (interface{}, error) {
+		return 99, nil
+	})
 
 	should.Error(kitty.Eval(s, db, s.Field("User1"), "vf(this.name== 'bill'?'name should huang')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User1"), "vf(this.age==10?'error iii')"))
+	//	should.Nil(kitty.Eval(s, db, s.Field("User1"), "vf(this.age==10?'error iii')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(this==nil?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=user1.name,age=user1.age,department=dev')|vf(this.name=='huang'?'errorr')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='huang'?'name=`bill`,age=`20`,department=`sales`')|vf(this.name=='bill'?'errorr')"))
@@ -126,7 +129,7 @@ func TestExpr(t *testing.T) {
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "f('user.name')|vf(len(this)>0?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "set('hello,world')|vf(len(split(this,','))==2?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "db('user.department.id=user.id')|vf(this=='dev'?'error')"))
-	should.Nil(kitty.Eval(s, db, s.Field("Age"), "set_if(user_slice[0].name=='huang'?'99')|vf(this==99?'error')"))
+	should.Nil(kitty.Eval(s, db, s.Field("Age"), "set_if(user_slice[0].name=='huang'?test())|vf(this==99?sprintf('err:%d',f('age')))"))
 }
 func TestVf(t *testing.T) {
 	defer db.Close()
@@ -135,6 +138,7 @@ func TestVf(t *testing.T) {
 	s.Field("User1").Set(&User{})
 	s.Field("User1").Field("Name").Set("huang")
 	s.Field("User1").Field("Age").Set(10)
+	s.SetFieldValue(s.Field("User1").Field("Age"), 10)
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
 	should.Error(kitty.Eval(s, db, s.Field("User1"), "vf(this.name== 'bill'?'name should huang')"))
@@ -172,7 +176,7 @@ func TestRds(t *testing.T) {
 	// 多条记录
 	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'error1')"))
 	// 单条记录
-	should.Nil(kitty.Eval(s, db, s.Field("User1"), "rds('name=bill')|vf(this.name=='bill'?'error2')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User1"), "rds('name=bill')|vf(this.age>=10?'error2')"))
 	// scan到另外一个model
 	should.Nil(kitty.Eval(s, db, s.Field("UserResult"), "rds('','user.*')|vf(len(this)==2&&user_result[0].name=='huang'?'error1')"))
 	// 获取单列

@@ -233,6 +233,12 @@ func (s *Structs) getValue(param string) (interface{}, error) {
 		if tk.KindOfField == reflect.Interface {
 			return reflect.ValueOf(f.Value()).Elem().Interface(), nil
 		}
+		if tk.KindOfField >= reflect.Int && tk.KindOfField <= reflect.Float32 {
+			// 表达式比较只能返回float64
+			v := DereferenceValue(reflect.ValueOf(f.Value()))
+			a := float64(0)
+			return v.Convert(reflect.TypeOf(a)).Interface(), nil
+		}
 		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 	}
 	return param, nil
@@ -282,7 +288,7 @@ func (s *Structs) GetRelationsWithModel(fieldname string, modelName string) (fi 
 func (s *Structs) ParseFormValues(values url.Values) error {
 	for _, field := range s.Fields() {
 		k := field.Tag("kitty")
-		if len(k) > 0 && strings.Contains(k, "param") {
+		if len(k) > 0 && strings.Contains(k, "param") && !strings.Contains(k, "-;param") {
 			formfield := strcase.ToSnake(field.Name())
 			if formvalue, ok := values[formfield]; ok {
 				fk := TypeKind(field)

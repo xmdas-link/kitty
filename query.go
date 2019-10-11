@@ -33,21 +33,6 @@ func (q *query) prepare() *gorm.DB {
 
 func (q *query) one() (interface{}, error) {
 	tx := q.prepare()
-	/*
-		if result != nil {
-			rows, err := tx.Rows()
-			if err != nil {
-				return nil, err
-			}
-			if !rows.Next() {
-				return nil, nil
-			}
-			if err = tx.ScanRows(rows, result); err != nil {
-				return nil, err
-			}
-			q.search.ReturnCount = 1
-			return result, nil
-		}*/
 	if !tx.First(q.ModelStructs.raw).RecordNotFound() {
 		q.search.ReturnCount = 1
 		return q.ModelStructs.raw, nil
@@ -57,18 +42,7 @@ func (q *query) one() (interface{}, error) {
 
 func (q *query) multi() (interface{}, error) {
 	tx := q.prepare()
-
-	scan := true
-	//if result == nil {
 	objValue := makeSlice(reflect.TypeOf(q.ModelStructs.raw), 0)
 	result := objValue.Interface()
-	scan = false
-	//	} else {
-	//		rv := reflect.ValueOf(result)
-	//		objValue := makeSlice(reflect.TypeOf(rv.Elem().Interface()), 0)
-	//		objValue := makeSlice(reflect.TypeOf(result), 0)
-	//		result = objValue.Interface()
-	//	}
-
-	return pages(tx, q.search, result, scan)
+	return pages(tx, q.search, result, false)
 }

@@ -81,7 +81,7 @@ func (q *simpleQuery) update() error {
 		}
 	}
 	if whereCount == 0 {
-		return fmt.Errorf("unable update %s, where condition is needed", modelName)
+		return fmt.Errorf("unable update %s, missing query condition", modelName)
 	}
 	tx = tx.Update(q.Result.raw)
 
