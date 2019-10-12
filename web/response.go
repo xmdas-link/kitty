@@ -2,9 +2,12 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-sql-driver/mysql"
 	"github.com/xmdas-link/filter"
 )
 
@@ -22,6 +25,10 @@ func (c *ginResponse) success(data interface{}) {
 }
 
 func (c *ginResponse) fail(err error) {
+	if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+		log.Println(mysqlErr)
+		err = fmt.Errorf("数据库错误: %s", mysqlErr)
+	}
 	c.C.JSON(http.StatusOK, gin.H{"code": 0, "message": err.Error()})
 }
 
@@ -39,9 +46,13 @@ func (c *nativeResponse) success(data interface{}) {
 }
 
 func (c *nativeResponse) fail(err error) {
+	if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+		log.Println(mysqlErr)
+		err = fmt.Errorf("数据库错误: %s", mysqlErr)
+	}
 	res := map[string]interface{}{
-		"code": 0,
-		"message":  err.Error(),
+		"code":    0,
+		"message": err.Error(),
 	}
 	c.write(res)
 }

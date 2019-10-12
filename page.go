@@ -4,6 +4,7 @@ import (
 	"math"
 )
 
+// Page 分页
 type Page struct {
 	Page    uint32 `json:"page"`
 	Limit   uint32 `json:"limit"`
@@ -11,10 +12,12 @@ type Page struct {
 	Total   uint32 `json:"total"`
 }
 
+// GetOffset .
 func (p *Page) GetOffset() uint32 {
 	return (p.Page - 1) * p.Limit
 }
 
+// CountPages .
 func (p *Page) CountPages(total uint32) {
 	if p.Page == 0 {
 		p.Page = 1
@@ -33,6 +36,7 @@ func (p *Page) CountPages(total uint32) {
 	p.Total = total
 }
 
+// MakePage .
 func MakePage(page uint32, limit uint32, total uint32) Page {
 
 	var p = Page{

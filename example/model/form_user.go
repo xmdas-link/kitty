@@ -1,5 +1,7 @@
 package model
 
+import "github.com/xmdas-link/kitty"
+
 // FormCreateUser 创建User，表单参数定义Name Age Department
 // 参数校验： 1. 名称不能为空  2. 名称不能重复 (通过定义字段User)
 type FormCreateUser struct {
@@ -36,9 +38,14 @@ type FormUser struct {
 // 查询条件: 创建时间 / 部门 .
 // 规则：
 type FormUserList struct {
-	List       []*User `kitty:"bind:user.*;bindresult;"`
+	List       []*User  `kitty:"bind:user.*;bindresult;"`
 	Name       []string `json:"-" kitty:"param:user.name;"`
-	CreateTime *string `json:"-" kitty:"param:user.created_at;"`
-	Department *string `json:"-" kitty:"param:user.department;"`
-	User       User    `json:"-" kitty:"master"`
+	CreateTime *string  `json:"-" kitty:"param:user.created_at;"`
+	Department *string  `json:"-" kitty:"param:user.department;"`
+
+	Page  uint32 `json:"-" kitty:"param" vd:"$>0&&$<100;msg:'input page'"`
+	Limit uint32 `json:"-" kitty:"param" vd:"$>0&&$<100;msg:'input limit'"`
+	Pages *kitty.Page
+
+	User User `json:"-" kitty:"master"`
 }

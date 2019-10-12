@@ -6,7 +6,7 @@ import jsoniter "github.com/json-iterator/go"
 type CrudResult struct {
 	Code    int         `json:"code,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
-	Page    *Page       `json:"page,omitempty"`
+//	Page    *Page       `json:"page,omitempty"`
 	Count   *int        `json:"count,omitempty"`
 	Message string      `json:"message,omitempty"`
 	Ref     int64       `json:"ref,omitempty"`

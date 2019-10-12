@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/iancoleman/strcase"
 
@@ -28,6 +29,10 @@ func (ks *kittys) parse() error {
 		fmt.Printf("field name: %+v\n", f.Name())
 		if k := f.Tag("kitty"); len(k) > 0 && !strings.Contains(k, "bind") {
 			if f.Kind() == reflect.Struct {
+				switch f.Value().(type) {
+				case time.Time, *time.Time:
+					continue
+				}
 				modelName := ToCamel(reflect.TypeOf(f.Value()).Name())
 				kitty := &kitty{ModelStructs: ks.ModelStructs}
 				kitty.parse(k, modelName, f.Name(), ks.db)
@@ -134,7 +139,7 @@ func (ks *kittys) where() []*fieldQryFormat {
 	masterModel := strcase.ToSnake(ks.master().ModelName)
 	tblname := strcase.ToSnake(ks.master().TableName)
 	for _, v := range ks.qryFormats {
-		if masterModel == v.model && len(v.format) == 0 { // 带有format 约束的，放入having
+		if masterModel == v.model && len(v.format) == 0 && !v.order { // 带有format 约束的，放入having
 			s = append(s, &fieldQryFormat{
 				operator: fmt.Sprintf("%s.%s %s", tblname, v.bindfield, v.operator),
 				value:    v.value,
@@ -143,7 +148,7 @@ func (ks *kittys) where() []*fieldQryFormat {
 	}
 
 	for _, v := range ks.qryFormats {
-		if len(v.format) == 0 {
+		if len(v.format) == 0 && !v.order {
 			for _, bind := range ks.binds {
 				fname := strcase.ToSnake(bind.FieldName)
 				if fname == v.fname {
@@ -165,10 +170,25 @@ func (ks *kittys) groupby() []string {
 	}
 	return s
 }
+
 func (ks *kittys) having() []*fieldQryFormat {
 	s := []*fieldQryFormat{}
 	for _, v := range ks.qryFormats {
-		if len(v.format) > 0 { // 带有format 约束的，放入having
+		if len(v.format) > 0 && !v.order { // 带有format 约束的，放入having
+			s = append(s, v)
+		}
+	}
+	return s
+}
+
+func (ks *kittys) order() []*fieldQryFormat {
+	s := []*fieldQryFormat{}
+	for _, v := range ks.qryFormats {
+		if v.order {
+			if kit := ks.get(ToCamel(v.model)); kit != nil {
+				v.bindfield = fmt.Sprintf("%s.%s", kit.TableName, v.bindfield)
+			}
+			//like users.id desc, count_issues asc
 			s = append(s, v)
 		}
 	}

@@ -2,6 +2,7 @@ package kitty
 
 import (
 	"fmt"
+	"runtime"
 
 	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/jinzhu/gorm"
@@ -72,6 +73,13 @@ func (crud *crud) queryObj() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
+	defer func() {
+		if r := recover(); r != nil {
+			var buf [4096]byte
+			n := runtime.Stack(buf[:], false)
+			fmt.Printf("qry==> %s\n", string(buf[:n]))
+		}
+	}()
 
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
@@ -79,6 +87,17 @@ func (crud *crud) queryObj() (interface{}, error) {
 
 	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
+	}
+
+	Page := &Page{}
+	if f, ok := s.FieldOk("Page"); ok {
+		Page.Page = f.Value().(uint32)
+	}
+	if f, ok := s.FieldOk("Limit"); ok {
+		Page.Limit = f.Value().(uint32)
+	}
+	if Page.Limit > 0 && Page.Page > 0 {
+		search.Page = Page
 	}
 
 	kittys := &kittys{
@@ -124,6 +143,10 @@ func (crud *crud) queryObj() (interface{}, error) {
 		}
 	}
 
+	if f, ok := s.FieldOk("Pages"); ok && search.Page != nil {
+		f.Set(search.Page)
+	}
+
 	return s.raw, nil
 }
 
@@ -155,14 +178,14 @@ func (crud *crud) createObj() (interface{}, error) {
 
 	tx := db.Begin()
 
-	if kittyMode == releaseCode {
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-				fmt.Println("create error. something happen...")
-			}
-		}()
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			var buf [4096]byte
+			n := runtime.Stack(buf[:], false)
+			fmt.Printf("create==> %s\n", string(buf[:n]))
+			tx.Rollback()
+		}
+	}()
 
 	qry := &simpleQuery{
 		db:           tx,
@@ -237,14 +260,14 @@ func (crud *crud) updateObj() (interface{}, error) {
 		return nil, err
 	}
 	tx := db.Begin()
-	if kittyMode == releaseCode {
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-				fmt.Println("update error. something happen...")
-			}
-		}()
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			var buf [4096]byte
+			n := runtime.Stack(buf[:], false)
+			fmt.Printf("update==> %s\n", string(buf[:n]))
+		}
+	}()
 
 	qry := &simpleQuery{
 		db:           tx,

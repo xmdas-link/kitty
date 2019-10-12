@@ -18,6 +18,7 @@ type joinQuery struct {
 	Where        []*fieldQryFormat
 	GroupBy      []string
 	Having       []*fieldQryFormat
+	order        []*fieldQryFormat
 }
 
 func (q *joinQuery) prepare() *gorm.DB {
@@ -36,6 +37,10 @@ func (q *joinQuery) prepare() *gorm.DB {
 	for _, v := range q.Having {
 		tx = tx.Having(v.whereExpr(), v.value...)
 	}
+	for _, v := range q.order {
+		tx = tx.Order(v.orderExpr())
+	}
+
 	return tx
 }
 func (q *joinQuery) one() (interface{}, error) {

@@ -60,11 +60,6 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		if res != nil {
 			result.Data = res
 			s.nameAs(nameAs)
-			if search.Page != nil {
-				result.Page = search.Page
-				result.Count = new(int)
-				*result.Count = search.ReturnCount
-			}
 		} else if action == "R" {
 			result.Code = 0
 			result.Message = "没有记录"

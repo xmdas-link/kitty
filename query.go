@@ -14,6 +14,7 @@ type query struct {
 	ModelStructs *Structs
 	queryString  []*fieldQryFormat //参数
 	queryStruct  interface{}       //参数
+	order        []*fieldQryFormat
 }
 
 func (q *query) prepare() *gorm.DB {

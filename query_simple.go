@@ -7,7 +7,6 @@ import (
 
 	"github.com/iancoleman/strcase"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 )
 
@@ -36,14 +35,9 @@ func (q *simpleQuery) create() (interface{}, error) {
 	tx := q.db.Create(q.Result.raw)
 
 	if err := tx.Error; err != nil {
-		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
-			if mysqlErr.Number == 1062 {
-				// solve the duplicate key error.
-				return nil, fmt.Errorf("duplicate key, error: %s", mysqlErr)
-			}
-		}
 		return nil, err
 	}
+
 	q.search.ReturnCount = int(tx.RowsAffected)
 
 	for _, v := range q.Next {
@@ -109,12 +103,6 @@ func (q *simpleQuery) update() error {
 	tx = tx.Updates(updates)
 
 	if err := tx.Error; err != nil {
-		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
-			if mysqlErr.Number == 1062 {
-				// solve the duplicate key error.
-				return fmt.Errorf("duplicate key, error: %s", mysqlErr)
-			}
-		}
 		return err
 	}
 	q.search.ReturnCount = int(tx.RowsAffected)

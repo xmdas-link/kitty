@@ -44,11 +44,20 @@ type fieldQryFormat struct {
 	operator      string        // 比较方式
 	value         []interface{} // 具体的值
 	withCondition bool          // update where condition
-	format        string        // like format:sum($)
+	order         bool
+	format        string // like format:sum($)
 }
 
 func (f *fieldQryFormat) whereExpr() string {
 	return fmt.Sprintf("%s %s", f.bindfield, f.operator)
+}
+
+func (f *fieldQryFormat) orderExpr() string {
+	v := DereferenceValue(reflect.ValueOf(f.value[0])).Interface().(int)
+	if v > 0 {
+		return fmt.Sprintf("%s asc", f.bindfield)
+	}
+	return fmt.Sprintf("%s desc", f.bindfield)
 }
 
 // CreateModelStructs ...
@@ -321,24 +330,33 @@ func (s *Structs) ParseFormValues(values url.Values) error {
 	return nil
 }
 
+func isNil(field *structs.Field) bool {
+	switch field.Kind() {
+	case reflect.Ptr, reflect.Slice, reflect.Interface:
+		if reflect.ValueOf(field.Value()).IsNil() {
+			return true
+		}
+	}
+	return false
+}
+
 //buildAllParamQuery kitty模型格式化所有param的参数。 如果join链接，参数为输出结果的structs
 func (s *Structs) buildAllParamQuery() []*fieldQryFormat {
 	query := []*fieldQryFormat{}
 	for _, field := range s.Fields() {
 		bindParam := "param:" //like param:order_item.order_id
-		if k := field.Tag("kitty"); strings.Contains(k, bindParam) {
-			if field.Kind() == reflect.Ptr && reflect.ValueOf(field.Value()).IsNil() {
-				continue
-			}
+		if k := field.Tag("kitty"); strings.Contains(k, bindParam) && !isNil(field) {
 			if bindParam = GetSub(k, "param"); strings.Contains(bindParam, ".") {
 				bindField := strings.Split(bindParam, ".")
 				if q := formatQryParam(field); q != nil {
 					q.model = strcase.ToSnake(bindField[0])     // bind model name
 					q.fname = strcase.ToSnake(field.Name())     // structs field name
 					q.bindfield = strcase.ToSnake(bindField[1]) // bind model field
-
 					if strings.Contains(k, "condition") {
 						q.withCondition = true
+					}
+					if strings.Contains(k, "ORDER") {
+						q.order = true
 					}
 					query = append(query, q)
 				}
@@ -355,10 +373,7 @@ func (s *Structs) buildFormQuery(tblname, model string) []*fieldQryFormat {
 	query := []*fieldQryFormat{}
 	for _, field := range s.Fields() {
 		bindParam := "param:" + withModel + "." //param:order_item.order_id
-		if k := field.Tag("kitty"); strings.Contains(k, bindParam) {
-			if field.Kind() == reflect.Ptr && reflect.ValueOf(field.Value()).IsNil() {
-				continue
-			}
+		if k := field.Tag("kitty"); strings.Contains(k, bindParam) && !isNil(field) {
 			bindField := strings.Split(GetSub(k, "param"), ".")[1]
 			if q := formatQryParam(field); q != nil {
 				fname := strcase.ToSnake(bindField)
@@ -399,7 +414,6 @@ func (s *Structs) nameAs(names map[string][]string) {
 					ss := CreateModel(typeKind.ModelName) //NewModelStruct(typeKind.ModelName)
 					ss.nameAs(names)
 				}
-
 			} else {
 				f1(typeKind, k, names)
 			}

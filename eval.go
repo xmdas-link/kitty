@@ -91,6 +91,7 @@ func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) 
 		Where:        kittys.where(),
 		GroupBy:      kittys.groupby(),
 		Having:       kittys.having(),
+		order:        kittys.order(),
 	}
 	//return execqry(joinqry, kittys.multiResult)
 }
@@ -98,9 +99,14 @@ func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) 
 func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) qry {
 	modelName := strcase.ToSnake(kittys.master().ModelName)
 	var qryformats []*fieldQryFormat
+	var order []*fieldQryFormat
 	for _, v := range s.buildAllParamQuery() {
 		if v.model == modelName {
-			qryformats = append(qryformats, v)
+			if v.order {
+				order = append(order, v)
+			} else {
+				qryformats = append(qryformats, v)
+			}
 		}
 	}
 
