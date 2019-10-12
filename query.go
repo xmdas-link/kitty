@@ -17,6 +17,7 @@ type query struct {
 	order        []*fieldQryFormat
 }
 
+
 func (q *query) prepare() *gorm.DB {
 	tx := q.db
 	if len(q.fieldselect) > 0 {
