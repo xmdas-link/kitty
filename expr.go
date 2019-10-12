@@ -327,6 +327,14 @@ func (e *expr) init() {
 		if err := tx.Updates(updates).Error; err != nil {
 			return nil, err
 		}
+
+		//		if err := sWhere.fillValue(e.s, vWhere); err != nil {
+		//			return nil, err
+		//		}
+
+		//if err := tx.Model(CreateModel(model).raw).Updates(sUpdate.raw).Error; err != nil {
+		//	return nil, err
+		//}
 		return nil, nil
 	}
 
@@ -473,13 +481,14 @@ func (e *expr) init() {
 			return nil, err
 		}
 
+		q := newcrud(&config{
+			strs:   strs,
+			search: &SearchCondition{},
+			db:     e.db,
+			ctx:    e.ctx,
+		})
+
 		if TypeKind(e.f).KindOfField == reflect.Interface {
-			q := newcrud(&config{
-				strs:   strs,
-				search: &SearchCondition{},
-				db:     e.db,
-				ctx:    e.ctx,
-			})
 			res, err := q.queryExpr()
 			if err != nil {
 				return nil, err
@@ -488,11 +497,7 @@ func (e *expr) init() {
 			*pi = res
 			return nil, e.f.Set(pi)
 		}
-		local := &LocalCrud{
-			strs: strs,
-			DB:   e.db,
-		}
-		return local.Do(&SearchCondition{}, "R", e.ctx)
+		return q.queryObj()
 	}
 
 	functions["create_if"] = func(args ...interface{}) (interface{}, error) {
@@ -514,11 +519,13 @@ func (e *expr) init() {
 		slices := value.([]*Structs)
 		for i := 0; i < len(slices); i++ {
 			screate := slices[i]
-			local := &LocalCrud{
-				strs: screate,
-				DB:   e.db.New(),
-			}
-			if _, err := local.Do(&SearchCondition{}, "C", e.ctx); err != nil {
+			crud := newcrud(&config{
+				strs:   screate,
+				search: &SearchCondition{},
+				db:     e.db.New(),
+				ctx:    e.ctx,
+			})
+			if _, err := crud.createObj(); err != nil {
 				return nil, err
 			}
 		}
@@ -545,11 +552,12 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		local := &LocalCrud{
-			strs: strs,
-			DB:   e.db,
-		}
-		return local.Do(&SearchCondition{}, "C", e.ctx)
+		return newcrud(&config{
+			strs:   strs,
+			search: &SearchCondition{},
+			db:     e.db,
+			ctx:    e.ctx,
+		}).createObj()
 	}
 
 	functions["update_if"] = func(args ...interface{}) (interface{}, error) {
@@ -570,11 +578,13 @@ func (e *expr) init() {
 		slices := value.([]*Structs)
 		for i := 0; i < len(slices); i++ {
 			screate := slices[i]
-			local := &LocalCrud{
-				strs: screate,
-				DB:   e.db.New(),
-			}
-			if _, err := local.Do(&SearchCondition{}, "U", e.ctx); err != nil {
+			crud := newcrud(&config{
+				strs:   screate,
+				search: &SearchCondition{},
+				db:     e.db.New(),
+				ctx:    e.ctx,
+			})
+			if _, err := crud.updateObj(); err != nil {
 				return nil, err
 			}
 		}
@@ -592,11 +602,12 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		local := &LocalCrud{
-			strs: strs,
-			DB:   e.db,
-		}
-		return local.Do(&SearchCondition{}, "U", e.ctx)
+		return newcrud(&config{
+			strs:   strs,
+			search: &SearchCondition{},
+			db:     e.db,
+			ctx:    e.ctx,
+		}).updateObj()
 	}
 	functions["vf"] = func(args ...interface{}) (interface{}, error) {
 		if !args[0].(bool) {
