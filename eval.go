@@ -51,7 +51,13 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 	expr.init()
 	for _, f := range s.Fields() {
 		k := f.Tag("kitty")
-		if strings.Contains(k, "bindresult") {
+		if setter := GetSub(k, "setter"); len(setter) > 0 {
+			expr.f = f
+			if err := expr.eval(setter); err != nil {
+				return err
+			}
+		}
+		if strings.Contains(k, "bindresult") && !f.IsZero() {
 			tk := TypeKind(f)
 			if tk.KindOfField == reflect.Slice {
 				rv := reflect.ValueOf(f.Value())
@@ -68,11 +74,6 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 				if err := setter(sdata, param, db, c); err != nil {
 					return err
 				}
-			}
-		} else if setter := GetSub(k, "setter"); len(setter) > 0 {
-			expr.f = f
-			if err := expr.eval(setter); err != nil {
-				return err
 			}
 		}
 	}
@@ -115,6 +116,7 @@ func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm
 		search:       search,
 		ModelStructs: kittys.result,
 		queryString:  qryformats,
+		order:        order,
 	}
 	if len(kittys.binds) > 0 && kittys.binds[0] != nil {
 		q.fieldselect = kittys.binds[0].BindModelField

@@ -31,6 +31,88 @@ func (e *expr) init() {
 		functions[k] = v
 	}
 
+	var batchfill = func(s *Structs, f *structs.Field, args ...interface{}) (interface{}, error) {
+		count := float64(0)
+		if len(args) > 0 {
+			count = args[0].(float64)
+		}
+		modelNameForCreate := strcase.ToSnake(TypeKind(f).ModelName)
+		slices := make([]*Structs, 0)
+		if count > 0 {
+			for i := 0; i < int(count); i++ {
+				screate := CreateModel(modelNameForCreate)
+				slices = append(slices, screate)
+			}
+		} else {
+			// 并不需要动态创建，则当前的字段是有值的。
+			// 以当前的字段创建
+			fvalue := f.Value()
+			dslice := reflect.ValueOf(fvalue)
+			for i := 0; i < dslice.Len(); i++ {
+				screate := CreateModelStructs(dslice.Index(i).Interface())
+				slices = append(slices, screate)
+			}
+		}
+
+		for _, field := range s.Fields() {
+			k := field.Tag("kitty")
+			if len(k) > 0 && strings.Contains(k, fmt.Sprintf("param:%s", modelNameForCreate)) {
+				tk := TypeKind(field)
+				if tk.KindOfField == reflect.Slice { // []*Strcuts []*int
+					datavalue := field.Value() // slice
+					dslice := reflect.ValueOf(datavalue)
+					elemType := DereferenceType(tk.TypeOfField.Elem())
+					if elemType.Kind() == reflect.Struct {
+						for i := 0; i < dslice.Len(); i++ {
+							screate := slices[i]
+							dv := dslice.Index(i)
+							ss := CreateModelStructs(dv.Interface())
+							for _, field := range ss.Fields() {
+								fname := field.Name()
+								if f, ok := screate.FieldOk(fname); ok {
+									if err := screate.SetFieldValue(f, field.Value()); err != nil {
+										return nil, err
+									}
+								}
+							}
+						}
+					} else {
+						bindField := strings.Split(GetSub(k, "param"), ".")[1]
+						for i := 0; i < len(slices); i++ {
+							screate := slices[i]
+							f := screate.Field(ToCamel(bindField))
+							if err := screate.SetFieldValue(f, field.Value()); err != nil {
+								return nil, err
+							}
+						}
+					}
+				} else if tk.KindOfField == reflect.Struct {
+					for i := 0; i < len(slices); i++ {
+						screate := slices[i]
+						for _, subfield := range field.Fields() {
+							fname := subfield.Name()
+							if f, ok := screate.FieldOk(fname); ok {
+								if err := screate.SetFieldValue(f, field.Value()); err != nil {
+									return nil, err
+								}
+							}
+						}
+					}
+				} else {
+					bindField := strings.Split(GetSub(k, "param"), ".")[1]
+					for i := 0; i < len(slices); i++ {
+						screate := slices[i]
+						f := screate.Field(ToCamel(bindField))
+						if err := screate.SetFieldValue(f, field.Value()); err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+		}
+		return slices, nil
+	}
+
 	functions["len"] = func(args ...interface{}) (interface{}, error) {
 		if args == nil {
 			return (float64)(0), nil
@@ -150,9 +232,35 @@ func (e *expr) init() {
 		fun := functions["rd_update"]
 		return fun(args[1:]...)
 	}
-
+	var rdBatchCreate = func(s *Structs, f *structs.Field, args ...interface{}) (interface{}, error) {
+		value, err := batchfill(s, f, args...)
+		if err != nil {
+			return nil, err
+		}
+		slices := value.([]*Structs)
+		for i := 0; i < len(slices); i++ {
+			screate := slices[i]
+			if err := e.db.New().Create(screate.raw).Error; err != nil {
+				return nil, err
+			}
+		}
+		if len(slices) > 0 {
+			objSlice := makeSlice(reflect.TypeOf(slices[0].raw), len(slices))
+			objValue := objSlice.Elem()
+			for i := 0; i < len(slices); i++ {
+				screate := slices[i]
+				objValue.Index(i).Set(reflect.ValueOf(screate.raw))
+			}
+			return objValue.Interface(), nil
+		}
+		return nil, nil
+	}
 	//创建单条记录
 	functions["rd_create"] = func(args ...interface{}) (interface{}, error) {
+		tk := TypeKind(e.f)
+		if tk.KindOfField == reflect.Slice {
+			return rdBatchCreate(e.s, e.f, args...)
+		}
 		db := e.db
 		argv := args[0].(string)
 		v := strings.Split(argv, ",")
@@ -219,14 +327,6 @@ func (e *expr) init() {
 		if err := tx.Updates(updates).Error; err != nil {
 			return nil, err
 		}
-
-		//		if err := sWhere.fillValue(e.s, vWhere); err != nil {
-		//			return nil, err
-		//		}
-
-		//if err := tx.Model(CreateModel(model).raw).Updates(sUpdate.raw).Error; err != nil {
-		//	return nil, err
-		//}
 		return nil, nil
 	}
 
@@ -353,137 +453,6 @@ func (e *expr) init() {
 		return res, err
 	}
 
-	var batchfill = func(s *Structs, f *structs.Field, args ...interface{}) (interface{}, error) {
-		count := float64(0)
-		if len(args) > 0 {
-			count = args[0].(float64)
-		}
-		modelNameForCreate := strcase.ToSnake(TypeKind(f).ModelName)
-		slices := make([]*Structs, 0)
-		if count > 0 {
-			for i := 0; i < int(count); i++ {
-				screate := CreateModel(modelNameForCreate)
-				slices = append(slices, screate)
-			}
-		} else {
-			// 并不需要动态创建，则当前的字段是有值的。
-			// 以当前的字段创建
-			fvalue := f.Value()
-			dslice := reflect.ValueOf(fvalue)
-			for i := 0; i < dslice.Len(); i++ {
-				screate := CreateModelStructs(dslice.Index(i).Interface())
-				slices = append(slices, screate)
-			}
-		}
-
-		for _, field := range s.Fields() {
-			k := field.Tag("kitty")
-			if len(k) > 0 && strings.Contains(k, fmt.Sprintf("param:%s", modelNameForCreate)) {
-				tk := TypeKind(field)
-				if tk.KindOfField == reflect.Slice { // []*Strcuts []*int
-					datavalue := field.Value() // slice
-					dslice := reflect.ValueOf(datavalue)
-					elemType := DereferenceType(tk.TypeOfField.Elem())
-					if elemType.Kind() == reflect.Struct {
-						for i := 0; i < dslice.Len(); i++ {
-							screate := slices[i]
-							dv := dslice.Index(i)
-							ss := CreateModelStructs(dv.Interface())
-							for _, field := range ss.Fields() {
-								fname := field.Name()
-								if f, ok := screate.FieldOk(fname); ok {
-									if err := screate.SetFieldValue(f, field.Value()); err != nil {
-										return nil, err
-									}
-								}
-							}
-						}
-					} else {
-						bindField := strings.Split(GetSub(k, "param"), ".")[1]
-						for i := 0; i < len(slices); i++ {
-							screate := slices[i]
-							f := screate.Field(ToCamel(bindField))
-							if err := screate.SetFieldValue(f, field.Value()); err != nil {
-								return nil, err
-							}
-						}
-					}
-				} else if tk.KindOfField == reflect.Struct {
-					for i := 0; i < len(slices); i++ {
-						screate := slices[i]
-						for _, subfield := range field.Fields() {
-							fname := subfield.Name()
-							if f, ok := screate.FieldOk(fname); ok {
-								if err := screate.SetFieldValue(f, field.Value()); err != nil {
-									return nil, err
-								}
-							}
-						}
-					}
-				} else {
-					bindField := strings.Split(GetSub(k, "param"), ".")[1]
-					for i := 0; i < len(slices); i++ {
-						screate := slices[i]
-						f := screate.Field(ToCamel(bindField))
-						if err := screate.SetFieldValue(f, field.Value()); err != nil {
-							return nil, err
-						}
-					}
-				}
-			}
-		}
-		return slices, nil
-	}
-
-	var batchCreate = func(s *Structs, f *structs.Field, args ...interface{}) (interface{}, error) {
-		value, err := batchfill(s, f, args...)
-		if err != nil {
-			return nil, err
-		}
-		slices := value.([]*Structs)
-		for i := 0; i < len(slices); i++ {
-			screate := slices[i]
-			crud := newcrud(&config{
-				strs:   screate,
-				search: &SearchCondition{},
-				db:     e.db,
-				ctx:    e.ctx,
-			})
-			if _, err := crud.createObj(); err != nil {
-				return nil, err
-			}
-		}
-		if len(slices) > 0 {
-			objSlice := makeSlice(reflect.TypeOf(slices[0].raw), len(slices))
-			objValue := objSlice.Elem()
-			for i := 0; i < len(slices); i++ {
-				screate := slices[i]
-				objValue.Index(i).Set(reflect.ValueOf(screate.raw))
-			}
-			return objValue.Interface(), nil
-		}
-		return nil, nil
-	}
-	var batchUpdate = func(s *Structs, f *structs.Field, args ...interface{}) (interface{}, error) {
-		value, err := batchfill(s, f, args...)
-		if err != nil {
-			return nil, err
-		}
-		slices := value.([]*Structs)
-		for i := 0; i < len(slices); i++ {
-			screate := slices[i]
-			crud := newcrud(&config{
-				strs:   screate,
-				search: &SearchCondition{},
-				db:     e.db,
-				ctx:    e.ctx,
-			})
-			if _, err := crud.updateObj(); err != nil {
-				return nil, err
-			}
-		}
-		return nil, nil
-	}
 	var f1 = func(field *structs.Field, args ...interface{}) (*Structs, error) {
 		tk := TypeKind(field)
 		model := tk.ModelName
@@ -504,14 +473,13 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		q := newcrud(&config{
-			strs:   strs,
-			search: &SearchCondition{},
-			db:     e.db,
-			ctx:    e.ctx,
-		})
-
 		if TypeKind(e.f).KindOfField == reflect.Interface {
+			q := newcrud(&config{
+				strs:   strs,
+				search: &SearchCondition{},
+				db:     e.db,
+				ctx:    e.ctx,
+			})
 			res, err := q.queryExpr()
 			if err != nil {
 				return nil, err
@@ -520,7 +488,11 @@ func (e *expr) init() {
 			*pi = res
 			return nil, e.f.Set(pi)
 		}
-		return q.queryObj()
+		local := &LocalCrud{
+			strs: strs,
+			DB:   e.db,
+		}
+		return local.Do(&SearchCondition{}, "R", e.ctx)
 	}
 
 	functions["create_if"] = func(args ...interface{}) (interface{}, error) {
@@ -534,6 +506,34 @@ func (e *expr) init() {
 		return fun(args[1:]...)
 	}
 
+	var batchCreate = func(s *Structs, f *structs.Field, args ...interface{}) (interface{}, error) {
+		value, err := batchfill(s, f, args...)
+		if err != nil {
+			return nil, err
+		}
+		slices := value.([]*Structs)
+		for i := 0; i < len(slices); i++ {
+			screate := slices[i]
+			local := &LocalCrud{
+				strs: screate,
+				DB:   e.db.New(),
+			}
+			if _, err := local.Do(&SearchCondition{}, "C", e.ctx); err != nil {
+				return nil, err
+			}
+		}
+		if len(slices) > 0 {
+			objSlice := makeSlice(reflect.TypeOf(slices[0].raw), len(slices))
+			objValue := objSlice.Elem()
+			for i := 0; i < len(slices); i++ {
+				screate := slices[i]
+				objValue.Index(i).Set(reflect.ValueOf(screate.raw))
+			}
+			return objValue.Interface(), nil
+		}
+		return nil, nil
+	}
+
 	functions["create"] = func(args ...interface{}) (interface{}, error) {
 		tk := TypeKind(e.f)
 		if tk.KindOfField == reflect.Slice {
@@ -545,17 +545,11 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		res, err := newcrud(&config{
-			strs:   strs,
-			search: &SearchCondition{},
-			db:     e.db,
-			ctx:    e.ctx,
-		}).createObj()
-
-		if res != nil {
-			return strs.raw, nil
+		local := &LocalCrud{
+			strs: strs,
+			DB:   e.db,
 		}
-		return nil, err
+		return local.Do(&SearchCondition{}, "C", e.ctx)
 	}
 
 	functions["update_if"] = func(args ...interface{}) (interface{}, error) {
@@ -567,6 +561,24 @@ func (e *expr) init() {
 		}
 		fun := functions["update"]
 		return fun(args[1:]...)
+	}
+	var batchUpdate = func(s *Structs, f *structs.Field, args ...interface{}) (interface{}, error) {
+		value, err := batchfill(s, f, args...)
+		if err != nil {
+			return nil, err
+		}
+		slices := value.([]*Structs)
+		for i := 0; i < len(slices); i++ {
+			screate := slices[i]
+			local := &LocalCrud{
+				strs: screate,
+				DB:   e.db.New(),
+			}
+			if _, err := local.Do(&SearchCondition{}, "U", e.ctx); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
 	}
 
 	functions["update"] = func(args ...interface{}) (interface{}, error) {
@@ -580,12 +592,11 @@ func (e *expr) init() {
 			return nil, err
 		}
 
-		return newcrud(&config{
-			strs:   strs,
-			search: &SearchCondition{},
-			db:     e.db,
-			ctx:    e.ctx,
-		}).updateObj()
+		local := &LocalCrud{
+			strs: strs,
+			DB:   e.db,
+		}
+		return local.Do(&SearchCondition{}, "U", e.ctx)
 	}
 	functions["vf"] = func(args ...interface{}) (interface{}, error) {
 		if !args[0].(bool) {

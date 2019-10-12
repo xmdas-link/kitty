@@ -1,9 +1,6 @@
 package kitty
 
 import (
-	"fmt"
-	"runtime"
-
 	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/jinzhu/gorm"
 )
@@ -73,13 +70,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
-	defer func() {
-		if r := recover(); r != nil {
-			var buf [4096]byte
-			n := runtime.Stack(buf[:], false)
-			fmt.Printf("qry==> %s\n", string(buf[:n]))
-		}
-	}()
 
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
@@ -176,19 +166,8 @@ func (crud *crud) createObj() (interface{}, error) {
 		return nil, err
 	}
 
-	tx := db.Begin()
-
-	defer func() {
-		if r := recover(); r != nil {
-			var buf [4096]byte
-			n := runtime.Stack(buf[:], false)
-			fmt.Printf("create==> %s\n", string(buf[:n]))
-			tx.Rollback()
-		}
-	}()
-
 	qry := &simpleQuery{
-		db:           tx,
+		db:           db,
 		ModelStructs: s,
 		search:       search,
 		Result:       kittys.master().structs,
@@ -196,7 +175,7 @@ func (crud *crud) createObj() (interface{}, error) {
 	for _, v := range kittys.kittys {
 		if !v.Master {
 			qry.Next = append(qry.Next, &simpleQuery{
-				db:           tx,
+				db:           db,
 				ModelStructs: s,
 				search:       &SearchCondition{},
 				Result:       v.structs,
@@ -205,7 +184,6 @@ func (crud *crud) createObj() (interface{}, error) {
 	}
 	res, err := qry.create()
 	if err != nil {
-		tx.Rollback()
 		return nil, err
 	}
 	for _, v := range kittys.kittys {
@@ -227,12 +205,11 @@ func (crud *crud) createObj() (interface{}, error) {
 	}
 	if callbk != nil {
 		if err = callbk(s, db); err != nil {
-			tx.Rollback()
 			return nil, err
 		}
 	}
 
-	return s.raw, tx.Commit().Error
+	return s.raw, nil
 }
 
 func (crud *crud) updateObj() (interface{}, error) {
@@ -259,18 +236,9 @@ func (crud *crud) updateObj() (interface{}, error) {
 	if err := kittys.parse(); err != nil {
 		return nil, err
 	}
-	tx := db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			var buf [4096]byte
-			n := runtime.Stack(buf[:], false)
-			fmt.Printf("update==> %s\n", string(buf[:n]))
-		}
-	}()
 
 	qry := &simpleQuery{
-		db:           tx,
+		db:           db,
 		ModelStructs: s,
 		search:       search,
 		Result:       kittys.master().structs,
@@ -278,7 +246,7 @@ func (crud *crud) updateObj() (interface{}, error) {
 	for _, v := range kittys.kittys {
 		if !v.Master {
 			qry.Next = append(qry.Next, &simpleQuery{
-				db:           tx,
+				db:           db,
 				ModelStructs: s,
 				search:       &SearchCondition{},
 				Result:       v.structs,
@@ -287,7 +255,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 	}
 
 	if err := qry.update(); err != nil {
-		tx.Rollback()
 		return nil, err
 	}
 	params := make(map[string]interface{})
@@ -299,12 +266,11 @@ func (crud *crud) updateObj() (interface{}, error) {
 
 	if callbk != nil {
 		if err := callbk(s, db); err != nil {
-			tx.Rollback()
 			return nil, err
 		}
 	}
 
-	return s.raw, tx.Commit().Error
+	return s.raw, nil
 }
 
 //

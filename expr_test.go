@@ -222,3 +222,8 @@ func TestQryExpr(t *testing.T) {
 	should.Len(users2, 1)
 
 }
+
+func TestBatchCreate(t *testing.T) {
+
+	
+}

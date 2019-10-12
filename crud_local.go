@@ -2,6 +2,8 @@ package kitty
 
 import (
 	"errors"
+	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -11,6 +13,7 @@ import (
 //LocalCrud 本地操作
 type LocalCrud struct {
 	Model  string // RPC 最终会调用此，所以只能用model作为参数。
+	strs   *Structs
 	DB     *gorm.DB
 	Callbk SuccessCallback
 }
@@ -20,8 +23,24 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	//	if err := search.CheckParamValid(crud.Model); err != nil {
 	//		return nil, err
 	//	}
+	tx := local.DB
 
-	s := CreateModel(local.Model)
+	defer func() {
+		if r := recover(); r != nil {
+			var buf [4096]byte
+			n := runtime.Stack(buf[:], false)
+			fmt.Printf("Action: %s==> %s\n", action, string(buf[:n]))
+			tx.Rollback()
+		}
+	}()
+
+	tx = tx.Begin()
+
+	s := local.strs
+	if s == nil {
+		s = CreateModel(local.Model)
+	}
+
 	if s == nil {
 		return nil, errors.New("error in create model")
 	}
@@ -36,7 +55,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	crud := newcrud(&config{
 		strs:   s,
 		search: search,
-		db:     local.DB,
+		db:     tx,
 		ctx:    c,
 		callbk: local.Callbk,
 	})
@@ -51,6 +70,13 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	default:
 		return nil, errors.New("unknown model action")
 	}
+
+	if err == nil {
+		err = tx.Commit().Error
+	} else {
+		tx.Rollback()
+	}
+
 	if err == nil {
 		nameAs := make(map[string][]string)
 		result := CrudResult{
@@ -62,7 +88,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			s.nameAs(nameAs)
 		} else if action == "R" {
 			result.Code = 0
-			result.Message = "没有记录"
+			result.Message = "发生未知错误"
 		}
 		return &Result{
 			result,
