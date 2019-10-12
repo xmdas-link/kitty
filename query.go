@@ -29,6 +29,9 @@ func (q *query) prepare() *gorm.DB {
 	if q.queryStruct != nil {
 		tx = tx.Where(q.queryStruct)
 	}
+	for _, v := range q.order {
+		tx = tx.Order(v.orderExpr())
+	}
 	return tx
 }
 
