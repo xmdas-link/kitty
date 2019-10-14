@@ -327,14 +327,6 @@ func (e *expr) init() {
 		if err := tx.Updates(updates).Error; err != nil {
 			return nil, err
 		}
-
-		//		if err := sWhere.fillValue(e.s, vWhere); err != nil {
-		//			return nil, err
-		//		}
-
-		//if err := tx.Model(CreateModel(model).raw).Updates(sUpdate.raw).Error; err != nil {
-		//	return nil, err
-		//}
 		return nil, nil
 	}
 

@@ -94,7 +94,6 @@ func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) 
 		Having:       kittys.having(),
 		order:        kittys.order(),
 	}
-	//return execqry(joinqry, kittys.multiResult)
 }
 
 func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) qry {
@@ -110,6 +109,12 @@ func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm
 			}
 		}
 	}
+	scan := false
+
+	// 如果结果的模型不同于master，则用scan方法。
+	if kittys.master().ModelName != kittys.result.Name() {
+		scan = true
+	}
 
 	q := &query{
 		db:           db,
@@ -117,12 +122,12 @@ func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm
 		ModelStructs: kittys.result,
 		queryString:  qryformats,
 		order:        order,
+		scan:         scan,
 	}
 	if len(kittys.binds) > 0 && kittys.binds[0] != nil {
 		q.fieldselect = kittys.binds[0].BindModelField
 	}
 	return q
-	//	return execqry(qry, kittys.multiResult)
 }
 
 func execqry(q qry, multi bool) (interface{}, error) {

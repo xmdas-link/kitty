@@ -1,7 +1,6 @@
 package kitty
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 	"time"
@@ -79,18 +78,12 @@ func pages(db *gorm.DB, search *SearchCondition, result interface{}, scan bool) 
 
 	tx := db
 	if search.Page != nil {
-		// 参数检查
-		if search.Page.Limit == 0 {
-			return nil, errors.New("需指定每页返回个数")
-		}
-
 		total := 0
 		if scan {
-			db.New().Raw("select count(*) from (?) ", tx.QueryExpr()).Count(&total)
+			db.New().Raw("SELECT COUNT(*) FROM (?)", tx.QueryExpr()).Count(&total)
 		} else {
 			tx = tx.Count(&total)
 		}
-
 		// 页数
 		pageInfo := MakePage(search.Page.Page, search.Page.Limit, uint32(total))
 		search.Page.Limit = pageInfo.Limit

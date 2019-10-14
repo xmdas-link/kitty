@@ -13,10 +13,9 @@ type query struct {
 	search       *SearchCondition
 	ModelStructs *Structs
 	queryString  []*fieldQryFormat //参数
-	queryStruct  interface{}       //参数
 	order        []*fieldQryFormat
+	scan         bool //scan result
 }
-
 
 func (q *query) prepare() *gorm.DB {
 	tx := q.db
@@ -26,9 +25,6 @@ func (q *query) prepare() *gorm.DB {
 	tx = tx.Model(q.ModelStructs.raw)
 	for _, v := range q.queryString {
 		tx = tx.Where(v.whereExpr(), v.value...)
-	}
-	if q.queryStruct != nil {
-		tx = tx.Where(q.queryStruct)
 	}
 	for _, v := range q.order {
 		tx = tx.Order(v.orderExpr())
@@ -49,5 +45,5 @@ func (q *query) multi() (interface{}, error) {
 	tx := q.prepare()
 	objValue := makeSlice(reflect.TypeOf(q.ModelStructs.raw), 0)
 	result := objValue.Interface()
-	return pages(tx, q.search, result, false)
+	return pages(tx, q.search, result, q.scan)
 }
