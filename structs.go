@@ -55,9 +55,9 @@ func (f *fieldQryFormat) whereExpr() string {
 func (f *fieldQryFormat) orderExpr() string {
 	v := DereferenceValue(reflect.ValueOf(f.value[0])).Interface().(int)
 	if v > 0 {
-		return fmt.Sprintf("%s asc", f.bindfield)
+		return fmt.Sprintf("%s ASC", f.bindfield)
 	}
-	return fmt.Sprintf("%s desc", f.bindfield)
+	return fmt.Sprintf("%s DESC", f.bindfield)
 }
 
 // CreateModelStructs ...
@@ -135,6 +135,9 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 			return f1(reflect.ValueOf(stamp))
 		}
 		return fmt.Errorf("%s: %v 时间格式错误", f.Name(), rv)
+	case bool, *bool:
+		zero := reflect.Zero(rv.Type()).Interface()
+		return f1(reflect.ValueOf(!reflect.DeepEqual(rv.Interface(), zero)))
 	}
 
 	var x interface{}
@@ -461,6 +464,7 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 	} else if typeKind.KindOfField == reflect.Interface {
 		// 碰到这个类型，为gorm的expr
 		singleValue = reflect.ValueOf(field.Value()).Elem()
+		return &fieldQryFormat{operator: fmt.Sprintf("%s (?)", operator), value: []interface{}{singleValue.Interface()}}
 	}
 	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}
 }

@@ -54,11 +54,11 @@ func (crud *crud) queryExpr() (interface{}, error) {
 	}
 
 	var qry qry
-	if len(kittys.kittys) > 1 {
-		qry = evalJoin(s, kittys, search, db)
-	} else {
-		qry = evalSimpleQry(s, kittys, search, db)
-	}
+	//	if len(kittys.kittys) > 1 {
+	qry = evalJoin(s, kittys, search, db)
+	//} else {
+	//	qry = evalSimpleQry(s, kittys, search, db)
+	//}
 	return qry.prepare().QueryExpr(), nil
 }
 
@@ -99,11 +99,11 @@ func (crud *crud) queryObj() (interface{}, error) {
 	}
 
 	var qry qry
-	if len(kittys.kittys) > 1 {
-		qry = evalJoin(s, kittys, search, db)
-	} else {
-		qry = evalSimpleQry(s, kittys, search, db)
-	}
+	//if len(kittys.kittys) > 1 {
+	qry = evalJoin(s, kittys, search, db)
+	//	} else {
+	//	qry = evalSimpleQry(s, kittys, search, db)
+	//}
 
 	var (
 		res interface{}

@@ -22,6 +22,7 @@ type User struct {
 	Manager    int
 	Birthday   time.Time
 	Salary     float64
+	Online     bool
 }
 
 type Company struct {
@@ -141,8 +142,9 @@ func TestVf(t *testing.T) {
 	s.SetFieldValue(s.Field("User1").Field("Age"), 10)
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(this.age==20?'error iii')"))
 	should.Error(kitty.Eval(s, db, s.Field("User1"), "vf(this.name== 'bill'?'name should huang')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User1"), "vf(this.age==10?'error iii')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User1"), "vf(this.age<user.age?'error iii')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'error1')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "vf(user_slice[1].name=='bill'?'error1')"))
 }
@@ -225,5 +227,4 @@ func TestQryExpr(t *testing.T) {
 
 func TestBatchCreate(t *testing.T) {
 
-	
 }

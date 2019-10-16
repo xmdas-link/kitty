@@ -133,9 +133,11 @@ func (e *expr) init() {
 		s := args[0].(string)
 		switch s {
 		case "loginid":
-			return e.ctx.CurrentUID(), nil
+			return e.ctx.CurrentUID()
+		default:
+			return e.ctx.GetCtxInfo(s)
 		}
-		return nil, fmt.Errorf("current function: unexpert %s", s)
+		//return nil, fmt.Errorf("current function: unexpert %s", s)
 	}
 
 	functions["f"] = func(args ...interface{}) (interface{}, error) {

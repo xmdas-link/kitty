@@ -55,6 +55,6 @@ func (web *CRUDWeb) result(action crudAction, response webResponse) {
 	} else if res != nil {
 		response.success(res)
 	} else {
-		response.success(gin.H{"code": 1, "message": "success"})
+		response.success(gin.H{"code": 0, "message": "发生未知异常"})
 	}
 }

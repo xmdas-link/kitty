@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -75,12 +77,16 @@ func FormUserList(r *gin.RouterGroup) {
 type currentCtx struct {
 }
 
-func (*currentCtx) GetUID(ctx interface{}) string {
+func (*currentCtx) GetUID(ctx interface{}) (string, error) {
 	//登录的信息存在gin的上下文。
 	c := ctx.(*gin.Context)
 	user := c.GetStringMapString("AuthUser")
 	if uid, ok := user["id"]; ok {
-		return uid
+		return uid, nil
 	}
-	return ""
+	return "", errors.New("nothing")
+}
+
+func (*currentCtx) GetCtxInfo(ctx interface{}, s string) (string, error) {
+	return "", nil
 }

@@ -84,6 +84,7 @@ func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) 
 	kittys.prepare()
 	return &joinQuery{
 		db:           db,
+		kittys:       kittys,
 		search:       search,
 		ModelStructs: kittys.result,
 		TableName:    kittys.master().TableName,

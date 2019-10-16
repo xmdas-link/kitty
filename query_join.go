@@ -10,6 +10,7 @@ import (
 // JoinQuery ... 联表查询
 type joinQuery struct {
 	db           *gorm.DB
+	kittys       *kittys
 	search       *SearchCondition
 	ModelStructs *Structs
 	TableName    string
@@ -43,15 +44,22 @@ func (q *joinQuery) prepare() *gorm.DB {
 }
 func (q *joinQuery) one() (interface{}, error) {
 	tx := q.prepare()
-	rows, err := tx.Rows()
-	if err != nil {
-		return nil, err
-	}
-	if !rows.Next() {
-		return nil, nil
-	}
-	if err = tx.ScanRows(rows, q.ModelStructs.raw); err != nil {
-		return nil, err
+
+	if len(q.kittys.kittys) > 1 {
+		rows, err := tx.Rows()
+		if err != nil {
+			return nil, err
+		}
+		if !rows.Next() {
+			return nil, nil
+		}
+		if err = tx.ScanRows(rows, q.ModelStructs.raw); err != nil {
+			return nil, err
+		}
+	} else {
+		if tx.First(q.ModelStructs.raw).RecordNotFound() {
+			return nil, nil
+		}
 	}
 	q.search.ReturnCount = 1
 	return q.ModelStructs.raw, nil
@@ -63,5 +71,12 @@ func (q *joinQuery) multi() (interface{}, error) {
 	objValue := makeSlice(reflect.TypeOf(q.ModelStructs.raw), 0)
 	objArr := objValue.Interface()
 
-	return pages(tx, q.search, objArr, true)
+	scan := true
+
+	if len(q.kittys.kittys) == 1 && q.kittys.master().ModelName == q.kittys.result.Name() {
+		scan = false
+	}
+
+	return pages(tx, q.search, objArr, scan)
+
 }

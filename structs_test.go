@@ -1,6 +1,7 @@
 package kitty_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Knetic/govaluate"
@@ -43,4 +44,7 @@ func TestSetFieldValue(t *testing.T) {
 	should.NoError(u.SetFieldValue(age, "11"))
 	should.NoError(u.SetFieldValue(dep, 11))
 
+	online := u.Field("Online")
+	should.NoError(u.SetFieldValue(online, ""))
+	fmt.Println(online.Value())
 }
