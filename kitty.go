@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/iancoleman/strcase"
-	"github.com/jinzhu/gorm"
 )
 
 type fieldBinding struct {
@@ -59,18 +58,7 @@ type kitty struct {
 }
 
 // parse kitty:"bind:order_item.*;
-func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding {
-	if s := GetSub(k, "bind"); len(s) > 0 {
-		modelField := strings.Split(s, ".")
-		binding := &fieldBinding{
-			ModelName:      modelName,
-			TableName:      j.TableName,
-			Format:         GetSub(k, "format"),
-			BindModelField: modelField[1],
-			FieldName:      strcase.ToSnake(fieldName),
-		}
-		return binding
-	}
+func (j *kitty) parse(k, modelName, fieldName string) {
 	j.Master = strings.Contains(k, "master")
 	//join aciton
 	j.JoinAction = strings.ToUpper(GetSub(k, "join")) + " JOIN"
@@ -78,7 +66,25 @@ func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding
 	if s := GetSub(k, "group"); len(s) > 0 {
 		j.Group = strings.Split(s, ",")
 	}
-	return nil
+}
+func (j *kitty) binding(k, modelName, fieldName string) *fieldBinding {
+	if s := GetSub(k, "bind"); len(s) > 0 {
+		modelField := strings.Split(s, ".")
+		return &fieldBinding{
+			ModelName:      modelName,
+			TableName:      j.TableName,
+			Format:         GetSub(k, "format"),
+			BindModelField: modelField[1],
+			FieldName:      strcase.ToSnake(fieldName),
+		}
+	}
+	return &fieldBinding{
+		ModelName:      modelName,
+		TableName:      j.TableName,
+		Format:         GetSub(k, "format"),
+		BindModelField: "*",
+		FieldName:      strcase.ToSnake(fieldName),
+	}
 }
 
 func (j *kitty) groupBy() []string {

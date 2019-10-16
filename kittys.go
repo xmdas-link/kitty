@@ -43,7 +43,7 @@ func (ks *kittys) parse(ms *Structs) error {
 					structs:      strs,
 					TableName:    ks.db.NewScope(strs.raw).TableName(),
 				}
-				kitty.parse(k, modelName, f.Name(), ks.db)
+				kitty.parse(k, modelName, f.Name())
 				ks.kittys = append(ks.kittys, kitty)
 				//if !ks.master().Master {
 				//	return fmt.Errorf("第一个结构体必须是标识master标签")
@@ -59,14 +59,14 @@ func (ks *kittys) parse(ms *Structs) error {
 			ks.result = tk.create()
 			ks.multiResult = tk.KindOfField == reflect.Slice
 			if kkkk := ks.get(tk.ModelName); kkkk != nil {
-				binding := kkkk.parse(k, tk.ModelName, f.Name(), ks.db)
+				binding := kkkk.binding(k, tk.ModelName, f.Name())
 				ks.binds = append(ks.binds, binding)
 			} else {
 				kbind := &kittys{
 					db:           ks.db,
 					ModelStructs: ks.result,
 				}
-				if err := kbind.parse(ks.ModelStructs); err != nil {
+				if err := kbind.parse(ms); err != nil {
 					return err
 				}
 				ks.binds = append(ks.binds, kbind.binds...)
@@ -88,7 +88,7 @@ func (ks *kittys) parse(ms *Structs) error {
 				structs:      strs,
 				TableName:    ks.db.NewScope(strs.raw).TableName(),
 			}
-			binding := kitty.parse(k, modelName, f.Name(), ks.db)
+			binding := kitty.binding(k, modelName, f.Name())
 			ks.binds = append(ks.binds, binding)
 		}
 	}
