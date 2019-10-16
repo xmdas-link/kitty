@@ -24,7 +24,7 @@ type kittys struct {
 }
 
 // Parse ...
-func (ks *kittys) parse() error {
+func (ks *kittys) parse(ms *Structs) error {
 	for _, f := range ks.ModelStructs.Fields() {
 		fmt.Printf("field name: %+v\n", f.Name())
 		if k := f.Tag("kitty"); len(k) > 0 && !strings.Contains(k, "bind") {
@@ -66,7 +66,7 @@ func (ks *kittys) parse() error {
 					db:           ks.db,
 					ModelStructs: ks.result,
 				}
-				if err := kbind.parse(); err != nil {
+				if err := kbind.parse(ks.ModelStructs); err != nil {
 					return err
 				}
 				ks.binds = append(ks.binds, kbind.binds...)
@@ -75,7 +75,12 @@ func (ks *kittys) parse() error {
 		} else if strings.Contains(k, "bind") {
 			modelField := GetSub(k, "bind")
 			modelName := ToCamel(strings.Split(modelField, ".")[0])
-			strs := tk.create()
+			var strs *Structs
+			if modelName == tk.ModelName {
+				strs = tk.create()
+			} else {
+				strs = ms.createModel(modelName)
+			}
 			kitty := &kitty{
 				ModelStructs: ks.ModelStructs,
 				ModelName:    modelName,

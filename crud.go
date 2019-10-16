@@ -49,7 +49,7 @@ func (crud *crud) queryExpr() (interface{}, error) {
 		ModelStructs: s,
 		db:           db,
 	}
-	if err := kittys.parse(); err != nil {
+	if err := kittys.parse(s); err != nil {
 		return nil, err
 	}
 
@@ -94,7 +94,7 @@ func (crud *crud) queryObj() (interface{}, error) {
 		ModelStructs: s,
 		db:           db,
 	}
-	if err := kittys.parse(); err != nil {
+	if err := kittys.parse(s); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +162,7 @@ func (crud *crud) createObj() (interface{}, error) {
 		ModelStructs: s,
 		db:           db,
 	}
-	if err := kittys.parse(); err != nil {
+	if err := kittys.parse(s); err != nil {
 		return nil, err
 	}
 
@@ -233,7 +233,7 @@ func (crud *crud) updateObj() (interface{}, error) {
 		ModelStructs: s,
 		db:           db,
 	}
-	if err := kittys.parse(); err != nil {
+	if err := kittys.parse(s); err != nil {
 		return nil, err
 	}
 
