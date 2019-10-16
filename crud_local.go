@@ -52,6 +52,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		res interface{}
 		err error
 	)
+	
 	crud := newcrud(&config{
 		strs:   s,
 		search: search,
