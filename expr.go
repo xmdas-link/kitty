@@ -36,11 +36,12 @@ func (e *expr) init() {
 		if len(args) > 0 {
 			count = args[0].(float64)
 		}
-		modelNameForCreate := strcase.ToSnake(TypeKind(f).ModelName)
+		tk := TypeKind(f)
+		modelNameForCreate := strcase.ToSnake(tk.ModelName)
 		slices := make([]*Structs, 0)
 		if count > 0 {
 			for i := 0; i < int(count); i++ {
-				screate := CreateModel(modelNameForCreate)
+				screate := tk.create()
 				slices = append(slices, screate)
 			}
 		} else {
@@ -200,7 +201,7 @@ func (e *expr) init() {
 		v2 := []string{v1[2], v[1]}
 		param := strings.Join(v2, "=")
 
-		ss := CreateModel(model)
+		ss := s.createModel(model)
 		if err := ss.fillValue(s, []string{param}); err != nil {
 			return nil, err
 		}
@@ -266,9 +267,7 @@ func (e *expr) init() {
 		db := e.db
 		argv := args[0].(string)
 		v := strings.Split(argv, ",")
-
-		model := TypeKind(e.f).ModelName
-		ss := CreateModel(model)
+		ss := tk.create()
 		if err := ss.fillValue(e.s, v); err != nil {
 			return nil, err
 		}
@@ -286,9 +285,10 @@ func (e *expr) init() {
 		updateCondition := args[0].(string)
 		whereCondition := args[1].(string)
 
-		model := TypeKind(e.f).ModelName
-		sUpdate := CreateModel(model)
-		//	sWhere := CreateModel(model)
+		tk := TypeKind(e.f)
+		//model := TypeKind(e.f).ModelName
+		sUpdate := tk.create()
+		//	sWhere := s.createModel(model)
 		tx = tx.Model(sUpdate.raw)
 
 		vWhere := strings.Split(whereCondition, ",")
@@ -355,7 +355,12 @@ func (e *expr) init() {
 			}
 		}
 
-		ss := CreateModel(model)
+		var ss *Structs
+		if modelDeclared {
+			ss = s.createModel(model)
+		} else {
+			ss = tk.create()
+		}
 
 		if len(args) > 0 { // 参数查询 product_id = product.id
 			argv := args[0].(string)
@@ -413,7 +418,7 @@ func (e *expr) init() {
 		case reflect.Struct:
 			if len(args) == 2 && modelDeclared {
 				tx = tx.Model(ss.raw)
-				result := CreateModel(TypeKind(e.f).ModelName)
+				result := tk.create()
 				err = tx.Scan(result.raw).Error
 				res = result.raw
 			} else {
@@ -428,7 +433,7 @@ func (e *expr) init() {
 				tx = tx.Model(ss.raw)
 				rt := DereferenceType(tk.TypeOfField.Elem())
 				if rt.Kind() == reflect.Struct {
-					result := CreateModel(tk.ModelName)
+					result := tk.create()
 					objValue := makeSlice(reflect.TypeOf(result.raw), 0)
 					err = tx.Scan(objValue.Interface()).Error
 					res = objValue.Elem().Interface()
@@ -457,14 +462,16 @@ func (e *expr) init() {
 
 	var f1 = func(field *structs.Field, args ...interface{}) (*Structs, error) {
 		tk := TypeKind(field)
-		model := tk.ModelName
+		var strs *Structs
 		if len(args) == 2 {
 			m := args[1].(string)
 			if len(m) > 0 {
-				model = args[1].(string)
+				model := args[1].(string)
+				strs = e.s.createModel(model)
 			}
+		} else {
+			strs = tk.create() //s.createModel(model)
 		}
-		strs := CreateModel(model)
 		params := strings.Split(args[0].(string), ",")
 		return strs, strs.fillValue(e.s, params)
 	}

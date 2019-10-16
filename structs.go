@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/iancoleman/strcase"
+	"github.com/modern-go/reflect2"
 
 	"github.com/fatih/structs"
 )
@@ -17,7 +18,6 @@ import (
 type Structs struct {
 	*structs.Struct
 	raw interface{}
-	//strTypes map[string]reflect2.Type
 }
 
 // FieldTypeAndKind 字段类型，模型名称
@@ -25,6 +25,14 @@ type FieldTypeAndKind struct {
 	ModelName   string       //模型名称
 	KindOfField reflect.Kind //类型  struct
 	TypeOfField reflect.Type //类型
+	t2          reflect2.Type
+}
+
+func (f *FieldTypeAndKind) create() *Structs {
+	if f.t2 != nil {
+		return CreateModelStructs(f.t2.New())
+	}
+	panic(fmt.Sprintf("model: %s must be declared", f.ModelName))
 }
 
 // StructFieldInfo 结构体信息
@@ -60,9 +68,52 @@ func (f *fieldQryFormat) orderExpr() string {
 	return fmt.Sprintf("%s DESC", f.bindfield)
 }
 
+func (s *Structs) createModel(name string) *Structs {
+	modelname := strcase.ToSnake(name)
+	var createStruct = func(field reflect2.Type) *Structs {
+		nativeType := DereferenceType(field.Type1())
+		if strcase.ToSnake(nativeType.Name()) == modelname {
+			return CreateModelStructs(field.New())
+		}
+		return nil
+	}
+
+	typ := reflect2.TypeOf(s.raw)
+	structType := (typ.(*reflect2.UnsafePtrType)).Elem().(*reflect2.UnsafeStructType)
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		if field.Type().Kind() == reflect.Struct {
+			if v := createStruct(field.Type()); v != nil {
+				return v
+			}
+		} else if field.Type().Kind() == reflect.Ptr {
+			ptrType := field.Type().(*reflect2.UnsafePtrType)
+			if ptrType.Elem().Kind() == reflect.Struct {
+				if v := createStruct(ptrType.Elem()); v != nil {
+					return v
+				}
+			}
+		} else if field.Type().Kind() == reflect.Slice {
+			sliceType := field.Type().(*reflect2.UnsafeSliceType)
+			elemType := sliceType.Elem()
+			if elemType.Kind() == reflect.Ptr {
+				elemType = elemType.(*reflect2.UnsafePtrType).Elem()
+			}
+			if elemType.Kind() == reflect.Struct {
+				if v := createStruct(elemType); v != nil {
+					return v
+				}
+			}
+		}
+	}
+
+	panic(fmt.Sprintf("model %s must be declared", name))
+}
+
 // CreateModelStructs ...
 func CreateModelStructs(v interface{}) *Structs {
-	return &Structs{structs.New(v), v}
+	s := &Structs{structs.New(v), v}
+	return s
 }
 
 // CallMethod .
@@ -443,6 +494,28 @@ func TypeKind(field *structs.Field) FieldTypeAndKind {
 	} else {
 		TypeKind.ModelName = field.Name()
 	}
+
+	typ := reflect2.TypeOf(field.Value())
+
+	if typ.Kind() == reflect.Struct {
+		TypeKind.t2 = typ
+	} else if typ.Kind() == reflect.Ptr {
+		ptrType := typ.(*reflect2.UnsafePtrType)
+		if ptrType.Elem().Kind() == reflect.Struct {
+			TypeKind.t2 = ptrType.Elem()
+		}
+	} else if typ.Kind() == reflect.Slice {
+		sliceType := typ.(*reflect2.UnsafeSliceType)
+		elemType := sliceType.Elem()
+		if elemType.Kind() == reflect.Ptr {
+			elemType = elemType.(*reflect2.UnsafePtrType).Elem()
+		}
+		if elemType.Kind() == reflect.Struct {
+			TypeKind.t2 = elemType
+		}
+
+	}
+
 	return TypeKind
 }
 
