@@ -33,8 +33,16 @@ func (ks *kittys) parse() error {
 				case time.Time, *time.Time:
 					continue
 				}
+				tk := TypeKind(f)
+				strs := tk.create()
 				modelName := ToCamel(reflect.TypeOf(f.Value()).Name())
-				kitty := &kitty{ModelStructs: ks.ModelStructs}
+				kitty := &kitty{
+					ModelStructs: ks.ModelStructs,
+					ModelName:    modelName,
+					FieldName:    f.Name(),
+					structs:      strs,
+					TableName:    ks.db.NewScope(strs.raw).TableName(),
+				}
 				kitty.parse(k, modelName, f.Name(), ks.db)
 				ks.kittys = append(ks.kittys, kitty)
 				//if !ks.master().Master {
@@ -45,12 +53,11 @@ func (ks *kittys) parse() error {
 	}
 	for _, f := range ks.ModelStructs.Fields() {
 		k := f.Tag("kitty")
+		tk := TypeKind(f)
 		if strings.Contains(k, "bindresult") {
 			ks.resultField = f.Name()
-			tk := TypeKind(f)
-			ks.result = CreateModel(tk.ModelName) //NewModelStruct(tk.ModelName)
+			ks.result = tk.create()
 			ks.multiResult = tk.KindOfField == reflect.Slice
-
 			if kkkk := ks.get(tk.ModelName); kkkk != nil {
 				binding := kkkk.parse(k, tk.ModelName, f.Name(), ks.db)
 				ks.binds = append(ks.binds, binding)
@@ -68,7 +75,14 @@ func (ks *kittys) parse() error {
 		} else if strings.Contains(k, "bind") {
 			modelField := GetSub(k, "bind")
 			modelName := ToCamel(strings.Split(modelField, ".")[0])
-			kitty := &kitty{ModelStructs: ks.ModelStructs}
+			strs := tk.create()
+			kitty := &kitty{
+				ModelStructs: ks.ModelStructs,
+				ModelName:    modelName,
+				FieldName:    f.Name(),
+				structs:      strs,
+				TableName:    ks.db.NewScope(strs.raw).TableName(),
+			}
 			binding := kitty.parse(k, modelName, f.Name(), ks.db)
 			ks.binds = append(ks.binds, binding)
 		}

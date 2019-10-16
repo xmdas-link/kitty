@@ -350,7 +350,7 @@ func (s *Structs) GetRelationsWithModel(fieldname string, modelName string) (fi 
 		}
 
 		if testNewForeignKey {
-			ss := CreateModel(modelName) //NewModelStruct(modelName)
+			ss := s.createModel(modelName) //NewModelStruct(modelName)
 			if _, ok := ss.FieldOk(fi.AssociationForeignkey); ok {
 				fi.Relationship = "has_one"
 			} else {
@@ -465,7 +465,7 @@ func (s *Structs) nameAs(names map[string][]string) {
 				if strings.Contains(k, fmt.Sprintf("bind:%s", strcase.ToSnake(typeKind.ModelName))) {
 					f1(typeKind, k, names)
 				} else {
-					ss := CreateModel(typeKind.ModelName) //NewModelStruct(typeKind.ModelName)
+					ss := typeKind.create()
 					ss.nameAs(names)
 				}
 			} else {

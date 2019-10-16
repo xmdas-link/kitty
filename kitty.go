@@ -60,13 +60,6 @@ type kitty struct {
 
 // parse kitty:"bind:order_item.*;
 func (j *kitty) parse(k, modelName, fieldName string, db *gorm.DB) *fieldBinding {
-	if len(j.TableName) == 0 {
-		j.ModelName = modelName
-		j.FieldName = fieldName
-		j.structs = CreateModel(modelName)                   //NewModelStruct(modelName)                                   // OrderItem
-		j.TableName = db.NewScope(j.structs.raw).TableName() //order_items
-	}
-
 	if s := GetSub(k, "bind"); len(s) > 0 {
 		modelField := strings.Split(s, ".")
 		binding := &fieldBinding{
