@@ -138,7 +138,6 @@ func (e *expr) init() {
 		default:
 			return e.ctx.GetCtxInfo(s)
 		}
-		//return nil, fmt.Errorf("current function: unexpert %s", s)
 	}
 
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
@@ -286,9 +285,7 @@ func (e *expr) init() {
 		whereCondition := args[1].(string)
 
 		tk := TypeKind(e.f)
-		//model := TypeKind(e.f).ModelName
 		sUpdate := tk.create()
-		//	sWhere := s.createModel(model)
 		tx = tx.Model(sUpdate.raw)
 
 		vWhere := strings.Split(whereCondition, ",")
@@ -470,7 +467,7 @@ func (e *expr) init() {
 				strs = e.s.createModel(model)
 			}
 		} else {
-			strs = tk.create() //s.createModel(model)
+			strs = tk.create()
 		}
 		params := strings.Split(args[0].(string), ",")
 		return strs, strs.fillValue(e.s, params)
@@ -622,14 +619,28 @@ var setParam = func(f *structs.Field, name string, params map[string]interface{}
 	if f.Kind() == reflect.Interface {
 		return
 	}
+	tk := TypeKind((f))
 	if f.IsZero() {
 		if reflect.TypeOf(f.Value()).Kind() == reflect.Ptr {
 			params[name] = nil
 		} else {
-			params[name] = reflect.Zero(reflect.TypeOf(f.Value())).Interface()
+			if tk.KindOfField >= reflect.Int && tk.KindOfField <= reflect.Float32 {
+				// 表达式比较只能返回float64
+				a := float64(0)
+				params[name] = a
+			} else {
+				params[name] = reflect.Zero(reflect.TypeOf(f.Value())).Interface()
+			}
 		}
 	} else {
-		params[name] = DereferenceValue(reflect.ValueOf(f.Value())).Interface()
+		if tk.KindOfField >= reflect.Int && tk.KindOfField <= reflect.Float32 {
+			// 表达式比较只能返回float64
+			v := DereferenceValue(reflect.ValueOf(f.Value()))
+			a := float64(0)
+			params[name] = v.Convert(reflect.TypeOf(a)).Interface()
+		} else {
+			params[name] = DereferenceValue(reflect.ValueOf(f.Value())).Interface()
+		}
 	}
 }
 
@@ -656,7 +667,7 @@ var sectionFunc = func(s *Structs, curf *structs.Field, sectionExp string, param
 			condition := sectionExp[a1+1 : b1]                   // result==1 && name==hello
 			condition = strings.ReplaceAll(condition, ",", "$$") //等下要用，分割
 
-			key := []string{"&&", "==", "||", ">", ">=", "<", "<=", "!="}
+			key := []string{"&&", "==", "<=", ">=", "||", ">", "<", "!="}
 			for _, v := range key {
 				condition = strings.ReplaceAll(condition, v, ",")
 			}
