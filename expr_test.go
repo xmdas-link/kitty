@@ -129,8 +129,12 @@ func TestExpr(t *testing.T) {
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rds('name=huang')|vf(len(split(this.name,','))==1?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "f('user.name')|vf(len(this)>0?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "set('hello,world')|vf(len(split(this,','))==2?'error')"))
-	should.Nil(kitty.Eval(s, db, s.Field("Name"), "db('user.department.id=user.id')|vf(this=='dev'?'error')"))
+	should.Nil(kitty.Eval(s, db, s.Field("Name"), "rds('id=user.id','user.department')|vf(this=='dev'?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Age"), "set_if(user_slice[0].name=='huang'?test())|vf(this==99?sprintf('err:%d',f('age')))"))
+
+	should.Nil(kitty.Eval(s, db, s.Field("Ages"), "rds('','user.age')|vf(this!=nil?'err')"))
+	should.Nil(kitty.Eval(s, db, s.Field("Age"), "count(f('ages'))|vf(this==2?'sss')"))
+
 }
 func TestVf(t *testing.T) {
 	defer db.Close()

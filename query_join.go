@@ -14,7 +14,7 @@ type joinQuery struct {
 	search       *SearchCondition
 	ModelStructs *Structs
 	TableName    string
-	Selects      []string
+	Selects      *fieldQryFormat
 	Joins        []*fieldQryFormat
 	Where        []*fieldQryFormat
 	GroupBy      []string
@@ -23,7 +23,7 @@ type joinQuery struct {
 }
 
 func (q *joinQuery) prepare() *gorm.DB {
-	tx := q.db.Table(q.TableName).Select(q.Selects)
+	tx := q.db.Table(q.TableName).Select(q.Selects.bindfield, q.Selects.value...)
 	for _, v := range q.Joins {
 		tx = tx.Joins(v.operator, v.value...)
 	}

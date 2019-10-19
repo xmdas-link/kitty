@@ -30,7 +30,8 @@ func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 	}
 	expr.init()
 	for _, f := range s.Fields() {
-		if getter := GetSub(f.Tag("kitty"), "getter"); len(getter) > 0 {
+		k := f.Tag("kitty")
+		if getter := GetSub(k, "getter"); len(getter) > 0 {
 			expr.f = f
 			if err := expr.eval(getter); err != nil {
 				return err

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/iancoleman/strcase"
 
@@ -13,6 +12,7 @@ import (
 
 // kittys ...
 type kittys struct {
+	ctx          Context //上下文
 	ModelStructs *Structs
 	db           *gorm.DB
 	kittys       []*kitty
@@ -23,31 +23,36 @@ type kittys struct {
 	qryFormats   []*fieldQryFormat
 }
 
+func isKitty(ms *Structs) bool {
+	for _, f := range ms.Fields() {
+		if k := f.Tag("kitty"); len(k) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // Parse ...
 func (ks *kittys) parse(ms *Structs) error {
 	for _, f := range ks.ModelStructs.Fields() {
 		fmt.Printf("field name: %+v\n", f.Name())
-		if k := f.Tag("kitty"); len(k) > 0 && !strings.Contains(k, "bind") {
+		if k := f.Tag("kitty"); len(k) > 0 && (strings.Contains(k, "master") || strings.Contains(k, "join")) {
 			if f.Kind() == reflect.Struct {
-				switch f.Value().(type) {
-				case time.Time, *time.Time:
-					continue
-				}
 				tk := TypeKind(f)
 				strs := tk.create()
-				modelName := ToCamel(reflect.TypeOf(f.Value()).Name())
+				modelName := tk.ModelName
 				kitty := &kitty{
 					ModelStructs: ks.ModelStructs,
 					ModelName:    modelName,
 					FieldName:    f.Name(),
 					structs:      strs,
-					TableName:    ks.db.NewScope(strs.raw).TableName(),
+					//	TableName:    ks.db.NewScope(strs.raw).TableName(),
+				}
+				if !isKitty(strs) {
+					kitty.TableName = ks.db.NewScope(strs.raw).TableName()
 				}
 				kitty.parse(k, modelName, f.Name())
 				ks.kittys = append(ks.kittys, kitty)
-				//if !ks.master().Master {
-				//	return fmt.Errorf("第一个结构体必须是标识master标签")
-				//}
 			}
 		}
 	}
@@ -69,29 +74,38 @@ func (ks *kittys) parse(ms *Structs) error {
 				if err := kbind.parse(ms); err != nil {
 					return err
 				}
+				for _, v := range kbind.binds {
+					v.strs = ks.result
+				}
 				ks.binds = append(ks.binds, kbind.binds...)
 			}
 
 		} else if strings.Contains(k, "bind") {
 			modelField := GetSub(k, "bind")
-			modelName := ToCamel(strings.Split(modelField, ".")[0])
-			var strs *Structs
-			if modelName == tk.ModelName {
-				strs = tk.create()
-			} else {
-				strs = ms.createModel(modelName)
-			}
 			kitty := &kitty{
 				ModelStructs: ks.ModelStructs,
-				ModelName:    modelName,
 				FieldName:    f.Name(),
-				structs:      strs,
-				TableName:    ks.db.NewScope(strs.raw).TableName(),
 			}
-			binding := kitty.binding(k, modelName, f.Name())
+			if strings.Contains(modelField, "(") && strings.Contains(modelField, ")") {
+				kitty.ModelName = tk.ModelName
+			} else {
+				modelName := ToCamel(strings.Split(modelField, ".")[0])
+				var strs *Structs
+				if modelName == tk.ModelName {
+					strs = tk.create()
+				} else {
+					strs = ms.createModel(modelName)
+				}
+				kitty.ModelName = modeName
+				if !isKitty(strs) {
+					kitty.TableName = ks.db.NewScope(strs.raw).TableName()
+				}
+			}
+			binding := kitty.binding(k, kitty.ModelName, f.Name())
 			ks.binds = append(ks.binds, binding)
 		}
 	}
+	
 	return nil
 }
 func (ks *kittys) check() error {
@@ -134,19 +148,29 @@ func (ks *kittys) prepare() {
 	}
 }
 
-func (ks *kittys) selects() []string {
+func (ks *kittys) selects() *fieldQryFormat {
 	s := []string{}
+	value := []interface{}{}
 	for _, v := range ks.binds {
-		s = append(s, v.selectAs())
+		format := v.selects(ks.ModelStructs, ks.db)
+		s = append(s, format.bindfield)
+		value = append(value, format.value...)
 	}
-	return s
+	return &fieldQryFormat{
+		bindfield: strings.Join(s, ", "),
+		value:     value,
+	}
 }
 
 func (ks *kittys) joins() []*fieldQryFormat {
 	s := []*fieldQryFormat{}
 	for _, v := range ks.kittys {
 		if !v.Master {
+			//			if isKitty(v.structs) {
+			//				s = append(s, v.joinKitty(ks.ModelStructs, ks.get(v.JoinTo), ks.db, ks.ctx))
+			//			} else {
 			s = append(s, v.joins(ks.ModelStructs, ks.get(v.JoinTo)))
+			//			}
 		}
 	}
 	return s
@@ -167,7 +191,7 @@ func (ks *kittys) where() []*fieldQryFormat {
 	}
 
 	for _, v := range ks.qryFormats {
-		if len(v.format) == 0 && !v.order {
+		if masterModel != v.model && len(v.format) == 0 && !v.order {
 			for _, bind := range ks.binds {
 				fname := strcase.ToSnake(bind.FieldName)
 				if fname == v.fname {

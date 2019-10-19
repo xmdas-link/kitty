@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jinzhu/gorm"
 
@@ -36,6 +37,7 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 		DB:     rpc.DB,
 		Callbk: rpc.Callbk,
 	}
+	fmt.Printf("rpc %s call\n", req.Model)
 
 	if res, err = crud.Do(&search, req.Action, rpc.Ctx); err == nil && res != nil {
 		if jsonbytes, err = json.Marshal(res); err == nil {

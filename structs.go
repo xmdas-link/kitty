@@ -270,6 +270,9 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 // params like: name=username id=1 id=product.id id=product.data.id
 // name=function('abcd')
 func (s *Structs) getValue(param string) (interface{}, error) {
+	if param[0] == '[' && param[len(param)-1] == ']' {
+		return param, nil
+	}
 	if strings.Contains(param, ".") {
 		vv := strings.Split(param, ".")
 
@@ -314,8 +317,7 @@ func (s *Structs) getValue(param string) (interface{}, error) {
 		if tk.KindOfField >= reflect.Int && tk.KindOfField <= reflect.Float32 {
 			// 表达式比较只能返回float64
 			v := DereferenceValue(reflect.ValueOf(f.Value()))
-			a := float64(0)
-			return v.Convert(reflect.TypeOf(a)).Interface(), nil
+			return v.Convert(reflect.TypeOf(float64(0))).Interface(), nil
 		}
 		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 	}
@@ -538,6 +540,11 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 		// 碰到这个类型，为gorm的expr
 		singleValue = reflect.ValueOf(field.Value()).Elem()
 		return &fieldQryFormat{operator: fmt.Sprintf("%s (?)", operator), value: []interface{}{singleValue.Interface()}}
+	}
+	if str, ok := singleValue.Interface().(string); ok {
+		if str[0] == '[' && str[len(str)-1] == ']' {
+			return &fieldQryFormat{operator: fmt.Sprintf("%s %s", operator, str[1:len(str)-1])}
+		}
 	}
 	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}
 }

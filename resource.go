@@ -35,13 +35,7 @@ func (res *Resource) checkValid() {
 			if modelfield != "bindresult" {
 				res.valid(modelfield)
 			}
-			tk := TypeKind(field)
-			ss := tk.create()
-			sub := &Resource{
-				Strs:  ss,
-				Model: ss.raw,
-			}
-			sub.checkValid()
+
 		}
 	}
 }
@@ -54,6 +48,9 @@ func test(s *Structs, mf, k string) {
 }
 
 func (res *Resource) valid(modelfield string) {
+	if !strings.Contains(modelfield, ".") {
+		return
+	}
 	v := strings.Split(modelfield, ".")
 	if v[0] == "$" || v[1] == "*" {
 		return

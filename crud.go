@@ -46,6 +46,7 @@ func (crud *crud) queryExpr() (interface{}, error) {
 	}
 
 	kittys := &kittys{
+		ctx:          c,
 		ModelStructs: s,
 		db:           db,
 	}
@@ -91,6 +92,7 @@ func (crud *crud) queryObj() (interface{}, error) {
 	}
 
 	kittys := &kittys{
+		ctx:          c,
 		ModelStructs: s,
 		db:           db,
 	}
