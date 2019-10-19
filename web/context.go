@@ -26,6 +26,10 @@ func (c *nativeCtx) GetCtxInfo(s string) (string, error) {
 	return c.ctx.GetCtxInfo(c.c, s)
 }
 
+func (c *nativeCtx) GetCtx() context.Context {
+	return c.c
+}
+
 type ginCtx struct {
 	c   *gin.Context
 	ctx externCtx
@@ -38,4 +42,8 @@ func (c *ginCtx) CurrentUID() (string, error) {
 
 func (c *ginCtx) GetCtxInfo(s string) (string, error) {
 	return c.ctx.GetCtxInfo(c.c, s)
+}
+
+func (c *ginCtx) GetCtx() context.Context {
+	return c.c.Request.Context()
 }

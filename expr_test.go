@@ -59,6 +59,7 @@ type Language struct {
 type UserResult struct {
 	Name       string
 	Department string
+	MyAge      float64 `alias:"age"`
 }
 
 type Test struct {
@@ -100,7 +101,8 @@ func TestExpr(t *testing.T) {
 	defer db.Close()
 	should := require.New(t)
 
-	s := kitty.CreateModel("Test")
+	v := &Test{}
+	s := kitty.CreateModelStructs(v)
 
 	s.Field("User1").Set(&User{})
 	s.Field("User1").Field("Name").Set("huang")
@@ -124,7 +126,9 @@ func TestExpr(t *testing.T) {
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_update('name=`billgates`,age=0','name=bill')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Company"), "vf(company==nil?'error')|rd_create('name=oracle,job=hr,user_id=user.id')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(company!=nil?'error')|rd_update_if(company!=nil?'department=company.name','name=billgates')"))
-	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()"))
+	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'xxx')"))
+	should.Nil(kitty.Eval(s, db, s.Field("FindByName"), "f('user_slice[*].name')|vf(len(this)==2?'xxx')"))
+	should.Nil(kitty.Eval(s, db, s.Field("UserResult"), "f('user_slice')|vf(len(this)==2&&user_result[0].name=='huang'?'error1')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User1"), "f('user_slice[0]')|vf(this!=nil&&this.name=='huang'?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rds('name=huang')|vf(len(split(this.name,','))==1?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Name"), "f('user.name')|vf(len(this)>0?'error')"))

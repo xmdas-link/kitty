@@ -2,9 +2,10 @@ package kitty
 
 // SearchCondition ...
 type SearchCondition struct {
-	FormValues  map[string][]string `json:"form_values,omitempty"`
-	Page        *Page               `json:"page,omitempty"`
-	ReturnCount int                 `json:"return_count,omitempty"`
+	FormValues  map[string][]string    `json:"form_values,omitempty"`
+	Page        *Page                  `json:"page,omitempty"`
+	ReturnCount int                    `json:"return_count,omitempty"`
+	Params      map[string]interface{} `json:"params,omitempty"`
 }
 
 /*

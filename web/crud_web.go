@@ -13,6 +13,7 @@ type Config struct {
 	DB     *gorm.DB
 	RPC    kitty.RPC
 	Callbk kitty.SuccessCallback
+	Params map[string]interface{}
 }
 
 // NewLocalWeb ..
@@ -24,7 +25,8 @@ func NewLocalWeb(conf *Config) *CRUDWeb {
 			DB:     conf.DB,
 			Callbk: conf.Callbk,
 		},
-		Ctx: conf.Ctx,
+		Ctx:    conf.Ctx,
+		Params: conf.Params,
 	}
 }
 
@@ -44,8 +46,9 @@ type crudAction func() (interface{}, error)
 
 // CRUDWeb web接口
 type CRUDWeb struct {
-	Crud kitty.CRUDInterface
-	Ctx  externCtx
+	Crud   kitty.CRUDInterface
+	Ctx    externCtx
+	Params map[string]interface{}
 }
 
 func (web *CRUDWeb) result(action crudAction, response webResponse) {

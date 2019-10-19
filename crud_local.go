@@ -52,7 +52,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		res interface{}
 		err error
 	)
-	
+
 	crud := newcrud(&config{
 		strs:   s,
 		search: search,
@@ -62,6 +62,8 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	})
 
 	switch action {
+	case "RPC":
+		res, err = crud.execRPC()
 	case "C":
 		res, err = crud.createObj()
 	case "R":

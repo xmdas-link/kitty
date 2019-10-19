@@ -12,9 +12,9 @@ func (web *CRUDWeb) List(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.API{
-		Form:     c.Request.Form,
-		Crud:     web.Crud,
-		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
+		Form: c.Request.Form,
+		Crud: web.Crud,
+		Ctx:  &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.List, &ginResponse{C: c})
 }
@@ -24,9 +24,9 @@ func (web *CRUDWeb) One(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.API{
-		Form:     c.Request.Form,
-		Crud:     web.Crud,
-		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
+		Form: c.Request.Form,
+		Crud: web.Crud,
+		Ctx:  &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.One, &ginResponse{C: c})
 }
@@ -36,9 +36,9 @@ func (web *CRUDWeb) Update(c *gin.Context) {
 	c.Request.ParseForm()
 
 	c1 := &kitty.API{
-		Form:     c.Request.PostForm,
-		Crud:     web.Crud,
-		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
+		Form: c.Request.PostForm,
+		Crud: web.Crud,
+		Ctx:  &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.Update, &ginResponse{C: c})
 }
@@ -54,9 +54,19 @@ func (web *CRUDWeb) Create(c *gin.Context) {
 	}
 
 	c1 := &kitty.API{
-		Form:     c.Request.PostForm,
-		Crud:     web.Crud,
-		Ctx:      &ginCtx{c: c, ctx: web.Ctx},
+		Form: c.Request.PostForm,
+		Crud: web.Crud,
+		Ctx:  &ginCtx{c: c, ctx: web.Ctx},
 	}
 	web.result(c1.Create, &ginResponse{C: c})
+}
+
+// CallRPC ..
+func (web *CRUDWeb) CallRPC(c *gin.Context) {
+	c1 := &kitty.API{
+		Crud:   web.Crud,
+		Params: web.Params,
+		Ctx:    &ginCtx{c: c, ctx: web.Ctx},
+	}
+	web.result(c1.CallRPC, &ginResponse{C: c})
 }

@@ -6,9 +6,10 @@ import (
 
 // API for web api
 type API struct {
-	Form url.Values
-	Crud CRUDInterface
-	Ctx  Context
+	Form   url.Values
+	Crud   CRUDInterface
+	Ctx    Context
+	Params map[string]interface{}
 }
 
 // List 。
@@ -33,4 +34,10 @@ func (c *API) Update() (interface{}, error) {
 func (c *API) Create() (interface{}, error) {
 	s := &SearchCondition{FormValues: c.Form}
 	return c.Crud.Do(s, "C", c.Ctx)
+}
+
+// CallRPC .
+func (c *API) CallRPC() (interface{}, error) {
+	s := &SearchCondition{Params: c.Params}
+	return c.Crud.Do(s, "RPC", c.Ctx)
 }

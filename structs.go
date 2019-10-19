@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Knetic/govaluate"
 	"github.com/iancoleman/strcase"
 	"github.com/modern-go/reflect2"
 
@@ -275,15 +276,16 @@ func (s *Structs) getValue(param string) (interface{}, error) {
 	}
 	if strings.Contains(param, ".") {
 		vv := strings.Split(param, ".")
-
 		fieldName := vv[0]
 		sliceIdx := -1
 		if i := strings.Index(fieldName, "["); i > 0 {
 			b := strings.Index(fieldName, "]")
 			str := fieldName[i+1 : b]
 			fieldName = fieldName[:i]
-			idx, _ := strconv.ParseInt(str, 10, 64)
-			sliceIdx = int(idx)
+			if str != "*" {
+				idx, _ := strconv.ParseInt(str, 10, 64)
+				sliceIdx = int(idx)
+			}
 		}
 		field := s.Field(ToCamel(fieldName))
 		if field.IsZero() {
@@ -296,6 +298,21 @@ func (s *Structs) getValue(param string) (interface{}, error) {
 		}
 		if tk.KindOfField == reflect.Slice {
 			slicevalue := DereferenceValue(reflect.ValueOf(fieldvalue))
+			if sliceIdx == -1 && len(vv[1:]) == 1 && slicevalue.Len() > 0 {
+				// 取所有切片的字段
+				subfield := vv[1]
+				fieldvalue = slicevalue.Index(0).Interface()
+				ss := CreateModelStructs(fieldvalue)
+				field := ss.Field(ToCamel(subfield))
+				objValue := makeSlice(TypeKind(field).TypeOfField, slicevalue.Len())
+				for i := 0; i < slicevalue.Len(); i++ {
+					fieldvalue = slicevalue.Index(i).Interface()
+					ss := CreateModelStructs(fieldvalue)
+					field := ss.Field(ToCamel(subfield))
+					objValue.Elem().Index(i).Set(reflect.ValueOf(field.Value()))
+				}
+				return objValue.Elem().Interface(), nil
+			}
 			if slicevalue.Len() < sliceIdx {
 				return nil, fmt.Errorf("slice idx overflow %s", field.Name())
 			}
@@ -547,6 +564,46 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 		}
 	}
 	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}
+}
+
+func (s *Structs) copy(src *Structs) {
+	for _, f := range s.Fields() {
+		// Name string `alias:"" getter:"set(xxx(f('aaabcd')))"`
+		fname := f.Name()
+
+		var setValue = func(name string) bool {
+			if sf, ok := src.FieldOk(name); ok {
+				s.SetFieldValue(f, sf.Value())
+				return true
+			}
+			return false
+		}
+
+		bok := false
+		if alias := f.Tag("alias"); len(alias) > 0 {
+			v := strings.Split(alias, ",")
+			for _, field := range v {
+				if setValue(ToCamel(field)) {
+					bok = true
+					break
+				}
+			}
+		}
+		if !bok {
+			if !setValue(fname) {
+				if get := f.Tag("getter"); len(get) > 0 {
+					expr := &expr{
+						s:         s,
+						f:         f,
+						functions: make(map[string]govaluate.ExpressionFunction),
+						params:    make(map[string]interface{}),
+					}
+					expr.init()
+					expr.eval(get)
+				}
+			}
+		}
+	}
 }
 
 // FormatQryField for test

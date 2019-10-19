@@ -19,7 +19,6 @@ func raw(ms *Structs, cur *Structs, db *gorm.DB, str string) interface{} {
 		createM:   ms.createModel,
 	}
 	expr.init()
-	expr.params["nil"] = nil
 
 	if cur != nil {
 		expr.params["s"] = cur.raw

@@ -14,7 +14,7 @@ import (
 	"github.com/Knetic/govaluate"
 )
 
-type modelCreateFunctions func(name string) *Structs
+type modelCreateFunction func(name string) *Structs
 
 type expr struct {
 	db        *gorm.DB
@@ -23,11 +23,13 @@ type expr struct {
 	functions map[string]govaluate.ExpressionFunction
 	params    map[string]interface{}
 	ctx       Context
-	createM   modelCreateFunctions
+	createM   modelCreateFunction
 }
 
 func (e *expr) init() {
 	e.params["nil"] = nil
+	e.params["s"] = e.s.raw
+	
 	functions := e.functions
 	for k, v := range exprFuncs {
 		functions[k] = v
@@ -167,14 +169,34 @@ func (e *expr) init() {
 			if fk.KindOfField == reflect.Slice {
 				thiskind := TypeKind(e.f)
 				if thiskind.KindOfField == reflect.Struct {
-					if thiskind.ModelName != fk.ModelName {
-						return nil, fmt.Errorf("model does not match %s", strfield)
-					}
 					slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
 					if slicevalue.Len() < sliceIdx {
 						return nil, fmt.Errorf("slice idx overflow %s", f.Name())
 					}
-					return slicevalue.Index(sliceIdx).Interface(), nil
+					fieldvalue := slicevalue.Index(sliceIdx).Interface()
+					if thiskind.ModelName != fk.ModelName {
+						src := CreateModelStructs(fieldvalue)
+						ss := thiskind.create()
+						ss.copy(src)
+						return ss.raw, nil
+					}
+					return fieldvalue, nil
+				} else if thiskind.KindOfField == reflect.Slice {
+					//同为切片，但结构体不一样。复制。
+					ty := DereferenceType(thiskind.TypeOfField.Elem())
+					if ty.Kind() == reflect.Struct {
+						slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
+						objValue := makeSlice(thiskind.TypeOfField, slicevalue.Len())
+						for i := 0; i < slicevalue.Len(); i++ {
+							fieldvalue := slicevalue.Index(i).Interface()
+							src := CreateModelStructs(fieldvalue)
+							ss := thiskind.create()
+							ss.copy(src)
+							objValue.Elem().Index(i).Set(reflect.ValueOf(ss.raw))
+						}
+						return objValue.Elem().Interface(), nil
+					}
+					return nil, fmt.Errorf("model does not match %s", strfield)
 				}
 			}
 			if fk.KindOfField == reflect.Interface {
@@ -751,8 +773,6 @@ func Eval(s *Structs, db *gorm.DB, f *structs.Field, exp string) error {
 		functions: make(map[string]govaluate.ExpressionFunction),
 		params:    make(map[string]interface{}),
 	}
-	expr.params["s"] = s.raw
-	expr.params["nil"] = nil
 	expr.init()
 
 	return expr.eval(exp)

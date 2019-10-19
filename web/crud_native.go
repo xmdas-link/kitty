@@ -11,9 +11,9 @@ import (
 func (web *CRUDWeb) List2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	c1 := &kitty.API{
-		Form:     r.Form,
-		Crud:     web.Crud,
-		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
+		Form: r.Form,
+		Crud: web.Crud,
+		Ctx:  &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.List, &nativeResponse{W: w})
 }
@@ -23,9 +23,9 @@ func (web *CRUDWeb) One2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	c1 := &kitty.API{
-		Form:     r.Form,
-		Crud:     web.Crud,
-		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
+		Form: r.Form,
+		Crud: web.Crud,
+		Ctx:  &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.One, &nativeResponse{W: w})
 }
@@ -35,9 +35,9 @@ func (web *CRUDWeb) Update2(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	c1 := &kitty.API{
-		Form:     r.PostForm,
-		Crud:     web.Crud,
-		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
+		Form: r.PostForm,
+		Crud: web.Crud,
+		Ctx:  &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.Update, &nativeResponse{W: w})
 }
@@ -53,9 +53,19 @@ func (web *CRUDWeb) Create2(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c1 := &kitty.API{
-		Form:     r.PostForm,
-		Crud:     web.Crud,
-		Ctx:      &nativeCtx{c: r.Context(), ctx: web.Ctx},
+		Form: r.PostForm,
+		Crud: web.Crud,
+		Ctx:  &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
 	web.result(c1.Create, &nativeResponse{W: w})
+}
+
+// CallRPC2 ..
+func (web *CRUDWeb) CallRPC2(w http.ResponseWriter, r *http.Request) {
+	c1 := &kitty.API{
+		Crud:   web.Crud,
+		Params: web.Params,
+		Ctx:    &ginCtx{c: c, ctx: web.Ctx},
+	}
+	web.result(c1.CallRPC, &ginResponse{C: c})
 }
