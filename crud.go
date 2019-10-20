@@ -408,9 +408,7 @@ func (crud *crud) execRPC() (interface{}, error) {
 						}
 						rpc.param.Field("Model").Set(tk.ModelName)
 						isKittyRequest = true
-						continue
-					}
-					if strings.Contains(param, paramformat) {
+					} else if strings.Contains(param, paramformat) {
 						if runtime := GetSub(k, "runtime"); len(runtime) > 0 {
 							expr := &expr{
 								s:         s,
