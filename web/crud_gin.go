@@ -63,7 +63,12 @@ func (web *CRUDWeb) Create(c *gin.Context) {
 
 // CallRPC ..
 func (web *CRUDWeb) CallRPC(c *gin.Context) {
+	form := c.Request.Form
+	if c.Request.Method == "POST" {
+		form = c.Request.PostForm
+	}
 	c1 := &kitty.API{
+		Form:   form,
 		Crud:   web.Crud,
 		Params: web.Params,
 		Ctx:    &ginCtx{c: c, ctx: web.Ctx},

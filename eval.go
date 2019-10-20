@@ -20,7 +20,7 @@ type update interface {
 	update() error
 }
 
-func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
+func Getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,
@@ -41,7 +41,7 @@ func getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 	return nil
 }
 
-func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
+func Setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
 	expr := &expr{
 		db:        db,
 		s:         s,
@@ -66,13 +66,13 @@ func setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 				for i := 0; i < len; i++ {
 					rvdata := rv.Index(i)
 					sdata := CreateModelStructs(rvdata.Interface())
-					if err := setter(sdata, param, db, c); err != nil {
+					if err := Setter(sdata, param, db, c); err != nil {
 						return err
 					}
 				}
 			} else if tk.KindOfField == reflect.Struct {
 				sdata := CreateModelStructs(f.Value())
-				if err := setter(sdata, param, db, c); err != nil {
+				if err := Setter(sdata, param, db, c); err != nil {
 					return err
 				}
 			}

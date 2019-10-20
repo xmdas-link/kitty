@@ -32,13 +32,13 @@ func NewLocalWeb(conf *Config) *CRUDWeb {
 
 // NewRPCWeb .
 func NewRPCWeb(conf *Config) *CRUDWeb {
-	res := kitty.NewResource(conf.Model)
+	kitty.NewResource(conf.Model)
 	return &CRUDWeb{
 		Crud: &kitty.RPCCrud{
-			Model: res.ModelName,
-			RPC:   conf.RPC,
+			RPC: conf.RPC,
 		},
-		Ctx: conf.Ctx,
+		Ctx:    conf.Ctx,
+		Params: conf.Params,
 	}
 }
 

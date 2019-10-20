@@ -38,6 +38,9 @@ func (c *API) Create() (interface{}, error) {
 
 // CallRPC .
 func (c *API) CallRPC() (interface{}, error) {
-	s := &SearchCondition{Params: c.Params}
+	s := &SearchCondition{
+		FormValues: c.Form,
+		Params:     c.Params,
+	}
 	return c.Crud.Do(s, "RPC", c.Ctx)
 }

@@ -39,7 +39,7 @@ func (ks *kittys) parse(ms *Structs) error {
 		if k := f.Tag("kitty"); len(k) > 0 && (strings.Contains(k, "master") || strings.Contains(k, "join")) {
 			if f.Kind() == reflect.Struct {
 				tk := TypeKind(f)
-				strs := tk.create()
+				strs := tk.Create()
 				modelName := tk.ModelName
 				kitty := &kitty{
 					ModelStructs: ks.ModelStructs,
@@ -61,7 +61,7 @@ func (ks *kittys) parse(ms *Structs) error {
 		tk := TypeKind(f)
 		if strings.Contains(k, "bindresult") {
 			ks.resultField = f.Name()
-			ks.result = tk.create()
+			ks.result = tk.Create()
 			ks.multiResult = tk.KindOfField == reflect.Slice
 			if kkkk := ks.get(tk.ModelName); kkkk != nil {
 				binding := kkkk.binding(k, tk.ModelName, f.Name())
@@ -92,7 +92,7 @@ func (ks *kittys) parse(ms *Structs) error {
 				modelName := ToCamel(strings.Split(modelField, ".")[0])
 				var strs *Structs
 				if modelName == tk.ModelName {
-					strs = tk.create()
+					strs = tk.Create()
 				} else {
 					strs = ms.createModel(modelName)
 				}

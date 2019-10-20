@@ -1,19 +1,7 @@
 package kitty
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"reflect"
-	"strings"
-
-	kittyrpc "github.com/xmdas-link/kitty/rpc/proto/kittyrpc"
-
-	"github.com/iancoleman/strcase"
-
-	"github.com/Knetic/govaluate"
 	vd "github.com/bytedance/go-tagexpr/validator"
-	"github.com/fatih/structs"
 	"github.com/jinzhu/gorm"
 )
 
@@ -53,7 +41,7 @@ func (crud *crud) queryExpr() (interface{}, error) {
 		return nil, err
 	}
 
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -88,7 +76,7 @@ func (crud *crud) queryObj() (interface{}, error) {
 		return nil, err
 	}
 
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -137,7 +125,7 @@ func (crud *crud) queryObj() (interface{}, error) {
 	params := make(map[string]interface{})
 	params["ms"] = s
 	params["kittys"] = kittys
-	if err = setter(s, params, db, c); err != nil {
+	if err = Setter(s, params, db, c); err != nil {
 		return nil, err
 	}
 
@@ -168,7 +156,7 @@ func (crud *crud) createObj() (interface{}, error) {
 		return nil, err
 	}
 
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -214,7 +202,7 @@ func (crud *crud) createObj() (interface{}, error) {
 	params := make(map[string]interface{})
 	params["ms"] = s
 	params["kittys"] = kittys
-	if err = setter(s, params, db, c); err != nil {
+	if err = Setter(s, params, db, c); err != nil {
 		return nil, err
 	}
 	if callbk != nil {
@@ -239,7 +227,7 @@ func (crud *crud) updateObj() (interface{}, error) {
 		return nil, err
 	}
 
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -274,7 +262,7 @@ func (crud *crud) updateObj() (interface{}, error) {
 	params := make(map[string]interface{})
 	params["ms"] = s
 	params["kittys"] = kittys
-	if err := setter(s, params, db, c); err != nil {
+	if err := Setter(s, params, db, c); err != nil {
 		return nil, err
 	}
 
@@ -296,206 +284,4 @@ func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c Context) (inte
 		ctx:    c,
 	})
 	return crud.queryObj()
-}
-
-/*
-type PageDevice struct {
-	SchoolRsp *deviceProto.GetResponse  `json:"-" kitty:"call:schoolClient.GetSchool"` //rpc执行结果
-	DeviceRsp *deviceProto.PageResponse `json:"-" kitty:"call:deviceClient.Page"`
-	UsersRsp  *userProto.UsersResponse  `json:"-" kitty:"call:userClient.GetUsers"`
-
-	GetRequest   *schoolProto.GetRequest  `json:"-" kitty:"protocol:schoolClient.GetSchool"`
-	PageRequest  *deviceProto.PageRequest `json:"-" kitty:"protocol:deviceClient.Page"` //rpc请求参数的声明
-	UsersRequest *userProto.UsersRequest  `json:"-" kitty:"protocol:userClient.GetUsers"`
-
-	Page          *deviceProto.Page `json:"-" kitty:"param:PageRequest.Page"` //rpc请求参数绑定
-	SchoolId      *uint             `json:"-" kitty:"param:PageRequest.SchoolId"`
-	SchoolStdCode *string           `json:"-" kitty:"param:PageRequest.SchoolStdCode;getter:f('schoolRsp.School.SchoolStdCode')"`
-	UserNames     []string          `json:"-" kitty:"param:UserRequest.UserNames;getter:f('DeviceRsp.DeviceList[*].EnrollNo')"`
-
-	User     userProto.User         `json:"-"`
-	List     []*deviceData          `kitty:"setter:f('DeviceRsp.DeviceList')"` //结果
-	UsersMap map[string]*deviceUser `kitty:"key:user.name;setter:f('UsersRsp.User')"`
-}
-*/
-func (crud *crud) execRPC() (interface{}, error) {
-	var (
-		s          = crud.strs
-		db         = crud.db
-		c          = crud.ctx
-		ctx        = crud.ctx.GetCtx()
-		callbk     = crud.callbk
-		rpcClients = crud.search.Params
-	)
-
-	type rpc struct {
-		name        string
-		client      *Structs
-		method      string
-		methodField string
-		param       *Structs
-		result      *structs.Field
-	}
-
-	if err := vd.Validate(s.raw); err != nil {
-		return nil, err
-	}
-	if err := getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
-	rpcs := make([]*rpc, 0)
-	var getrpc = func(client string, method string) *rpc {
-		for _, v := range rpcs {
-			if v.name == client && v.method == method {
-				return v
-			}
-		}
-		return nil
-	}
-	/*
-		var getrpc2 = func(methodField string) *rpc {
-			for _, v := range rpcs {
-				if v.methodField == methodField {
-					return v
-				}
-			}
-			return nil
-		}
-	*/
-	for _, f := range s.Fields() {
-		if k := f.Tag("kitty"); len(k) > 0 {
-			tk := TypeKind(f)
-			if call := GetSub(k, "call"); len(call) > 0 {
-				// UsersRsp  *userProto.UsersResponse  `json:"-" kitty:"call:userClient.GetUsers"`
-				v := strings.Split(call, ".")
-				rpcs = append(rpcs, &rpc{
-					name:   v[0],
-					client: CreateModelStructs(rpcClients[v[0]]),
-					method: v[1],
-					result: f,
-				})
-			}
-			if protocol := GetSub(k, "protocol"); len(protocol) > 0 {
-				// GetRequest   *schoolProto.GetRequest  `json:"-" kitty:"protocol:schoolClient.GetSchool"`
-				methodStrs := tk.create()
-				if err := f.Set(methodStrs.raw); err != nil {
-					return nil, err
-				}
-				v := strings.Split(protocol, ".")
-				rpc := getrpc(v[0], v[1])
-				rpc.methodField = f.Name() // PageRequest DeviceRequest KittyPersonRequest
-				rpc.param = methodStrs
-			}
-		}
-	}
-
-	for _, rpc := range rpcs {
-		//	SchoolId      *uint             `json:"-" kitty:"param:PageRequest.SchoolId;runtime:set(0)"`
-		paramformat := fmt.Sprintf("%s.", rpc.methodField) // PageRequest DeviceRequest
-		paramStrs := rpc.param
-		isKittyRequest := false
-		for _, f := range s.Fields() {
-			if k := f.Tag("kitty"); len(k) > 0 {
-				if param := GetSub(k, "param"); len(param) > 0 {
-					v := strings.Split(param, ".")
-					if v[1] == "Model" { // like KittyPersonRequest.Model; for kitty rpc request param->model
-						paramformat = fmt.Sprintf("%s.", f.Name()) // param:ModelPerson.xxx
-						tk := TypeKind(f)
-						paramStrs = tk.create()
-						if err := f.Set(paramStrs.raw); err != nil {
-							return nil, err
-						}
-						rpc.param.Field("Model").Set(tk.ModelName)
-						isKittyRequest = true
-					} else if strings.Contains(param, paramformat) {
-						if runtime := GetSub(k, "runtime"); len(runtime) > 0 {
-							expr := &expr{
-								s:         s,
-								f:         f,
-								functions: make(map[string]govaluate.ExpressionFunction),
-								params:    make(map[string]interface{}),
-							}
-							expr.init()
-							if err := expr.eval(runtime); err != nil {
-								return nil, err
-							}
-						}
-						ff := paramStrs.Field(v[1])
-						if err := paramStrs.SetFieldValue(ff, f.Value()); err != nil {
-							return nil, err
-						}
-					}
-				}
-			}
-			if isKittyRequest {
-				// format search condition.
-				form := make(map[string][]string)
-				for _, f := range paramStrs.Fields() {
-					if k := f.Tag("kitty"); len(k) > 0 && strings.Contains(k, "param:") && !strings.Contains(k, "-;param") {
-						x := ""
-						rv := DereferenceValue(reflect.ValueOf(f.Value()))
-						if rv.Kind() >= reflect.Bool && rv.Kind() <= reflect.Float64 {
-							x = fmt.Sprintf("%v", rv)
-						} else if rv.Kind() == reflect.String {
-							x = rv.Interface().(string)
-						}
-						if len(x) == 0 {
-							continue
-						}
-						name := strcase.ToSnake(f.Name())
-						if v := form[name]; v == nil {
-							form[name] = []string{}
-						}
-						v := form[name]
-						v = append(v, x)
-						form[name] = v
-					}
-				}
-				search := &SearchCondition{
-					FormValues: form,
-				}
-				res, err := json.Marshal(search)
-				if err != nil {
-					return nil, err
-				}
-				rpc.param.Field("Search").Set(string(res))
-			}
-		}
-		values := rpc.client.CallMethod(rpc.method, reflect.ValueOf(ctx), reflect.ValueOf(rpc.param.raw))
-
-		if err := values[1].Interface().(error); err != nil {
-			return nil, err
-		}
-
-		rspValue := values[0].Interface()
-		if rpc.method == "Call" {
-			rpcrsp := rspValue.(*kittyrpc.Response)
-			if len(rpcrsp.Msg) > 0 {
-				res := &CrudResult{}
-				if err := json.Unmarshal([]byte(rpcrsp.Msg), res); err != nil {
-					return nil, err
-				}
-				if res.Code != 1 {
-					return nil, errors.New(res.Message)
-				}
-				rspValue = res.Data
-			}
-		}
-
-		if err := rpc.result.Set(rspValue); err != nil {
-			return nil, err
-		}
-
-	}
-	if err := setter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
-	if callbk != nil {
-		if err := callbk(s, crud.db); err != nil {
-			return nil, err
-		}
-	}
-	return s.raw, nil
 }

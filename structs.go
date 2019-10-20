@@ -29,7 +29,8 @@ type FieldTypeAndKind struct {
 	t2          reflect2.Type
 }
 
-func (f *FieldTypeAndKind) create() *Structs {
+// Create ..
+func (f *FieldTypeAndKind) Create() *Structs {
 	if f.t2 != nil {
 		return CreateModelStructs(f.t2.New())
 	}
@@ -115,6 +116,9 @@ func (s *Structs) createModel(name string) *Structs {
 func CreateModelStructs(v interface{}) *Structs {
 	s := &Structs{structs.New(v), v}
 	return s
+}
+func (s *Structs) Raw() interface{} {
+	return s.raw
 }
 
 // CallMethod .
@@ -484,7 +488,7 @@ func (s *Structs) nameAs(names map[string][]string) {
 				if strings.Contains(k, fmt.Sprintf("bind:%s", strcase.ToSnake(typeKind.ModelName))) {
 					f1(typeKind, k, names)
 				} else {
-					ss := typeKind.create()
+					ss := typeKind.Create()
 					ss.nameAs(names)
 				}
 			} else {

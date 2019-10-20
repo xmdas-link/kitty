@@ -49,7 +49,7 @@ func (e *expr) init() {
 		slices := make([]*Structs, 0)
 		if count > 0 {
 			for i := 0; i < int(count); i++ {
-				screate := tk.create()
+				screate := tk.Create()
 				slices = append(slices, screate)
 			}
 		} else {
@@ -176,7 +176,7 @@ func (e *expr) init() {
 					fieldvalue := slicevalue.Index(sliceIdx).Interface()
 					if thiskind.ModelName != fk.ModelName {
 						src := CreateModelStructs(fieldvalue)
-						ss := thiskind.create()
+						ss := thiskind.Create()
 						ss.Copy(src)
 						return ss.raw, nil
 					}
@@ -190,7 +190,7 @@ func (e *expr) init() {
 						for i := 0; i < slicevalue.Len(); i++ {
 							fieldvalue := slicevalue.Index(i).Interface()
 							src := CreateModelStructs(fieldvalue)
-							ss := thiskind.create()
+							ss := thiskind.Create()
 							ss.Copy(src)
 							objValue.Elem().Index(i).Set(reflect.ValueOf(ss.raw))
 						}
@@ -238,7 +238,7 @@ func (e *expr) init() {
 		db := e.db
 		argv := args[0].(string)
 		v := strings.Split(argv, ",")
-		ss := tk.create()
+		ss := tk.Create()
 		if err := ss.fillValue(e.s, v); err != nil {
 			return nil, err
 		}
@@ -257,7 +257,7 @@ func (e *expr) init() {
 		whereCondition := args[1].(string)
 
 		tk := TypeKind(e.f)
-		sUpdate := tk.create()
+		sUpdate := tk.Create()
 		tx = tx.Model(sUpdate.raw)
 
 		vWhere := strings.Split(whereCondition, ",")
@@ -338,7 +338,7 @@ func (e *expr) init() {
 				tx = tx.Model(ss.raw)
 			}
 		} else {
-			ss = tk.create()
+			ss = tk.Create()
 		}
 
 		var fieldAs = func(field string) string {
@@ -405,7 +405,7 @@ func (e *expr) init() {
 		switch tk.TypeOfField.Kind() {
 		case reflect.Struct:
 			if len(args) == 2 && modelDeclared {
-				result := tk.create()
+				result := tk.Create()
 				err = tx.Scan(result.raw).Error
 				res = result.raw
 			} else {
@@ -419,7 +419,7 @@ func (e *expr) init() {
 			if len(args) == 2 && modelDeclared {
 				rt := DereferenceType(tk.TypeOfField.Elem())
 				if rt.Kind() == reflect.Struct {
-					result := tk.create()
+					result := tk.Create()
 					objValue := makeSlice(reflect.TypeOf(result.raw), 0)
 					err = tx.Scan(objValue.Interface()).Error
 					res = objValue.Elem().Interface()
@@ -462,7 +462,7 @@ func (e *expr) init() {
 				strs = e.createM(model)
 			}
 		} else {
-			strs = tk.create()
+			strs = tk.Create()
 		}
 		params := strings.Split(args[0].(string), ",")
 		return strs, strs.fillValue(e.s, params)
