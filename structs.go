@@ -261,6 +261,11 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 		if err != nil {
 			return err
 		}
+		if str, ok := value.(string); ok {
+			if str[0] == '[' && str[len(str)-1] == ']' {
+				value = str[1 : len(str)-1]
+			}
+		}
 		if value != nil {
 			if err := s.SetFieldValue(field, value); err != nil {
 				return err
@@ -270,64 +275,72 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 	return nil
 }
 
-// param可能是字段，也可能普通字符串. 如果非字段，则返回该param
-// param可能包含及联，则遇到slice的时候，默认读取第一个。
-// params like: name=username id=1 id=product.id id=product.data.id
-// name=function('abcd')
-func (s *Structs) getValue(param string) (interface{}, error) {
+type fieldList struct {
+	dst       *structs.Field
+	field     *structs.Field
+	fieldStrs *Structs
+	isSlice   bool
+	parent    *fieldList
+}
+
+func (list *fieldList) getValue(param string) (interface{}, error) {
 	if param[0] == '[' && param[len(param)-1] == ']' {
 		return param, nil
 	}
 	if strings.Contains(param, ".") {
 		vv := strings.Split(param, ".")
 		fieldName := vv[0]
-		sliceIdx := -1
+		sliceIdx := ""
 		if i := strings.Index(fieldName, "["); i > 0 {
 			b := strings.Index(fieldName, "]")
-			str := fieldName[i+1 : b]
+			sliceIdx = fieldName[i+1 : b]
 			fieldName = fieldName[:i]
-			if str != "*" {
-				idx, _ := strconv.ParseInt(str, 10, 64)
-				sliceIdx = int(idx)
-			}
 		}
-		field := s.Field(ToCamel(fieldName))
+		field := list.fieldStrs.Field(ToCamel(fieldName))
 		if field.IsZero() {
 			return nil, nil
 		}
 		fieldvalue := field.Value()
+		list.field = field
 		tk := TypeKind(field)
-		if tk.KindOfField != reflect.Slice && tk.KindOfField != reflect.Struct {
-			panic("")
-		}
-		if tk.KindOfField == reflect.Slice {
+		switch tk.KindOfField {
+		case reflect.Slice: // field[0].Name
+			if len(sliceIdx) == 0 {
+				return nil, fmt.Errorf("field %s slice index error", field.Name())
+			}
 			slicevalue := DereferenceValue(reflect.ValueOf(fieldvalue))
-			if sliceIdx == -1 && len(vv[1:]) == 1 && slicevalue.Len() > 0 {
-				// 取所有切片的字段
-				subfield := vv[1]
-				fieldvalue = slicevalue.Index(0).Interface()
-				ss := CreateModelStructs(fieldvalue)
-				field := ss.Field(ToCamel(subfield))
-				objValue := makeSlice(TypeKind(field).TypeOfField, slicevalue.Len())
-				for i := 0; i < slicevalue.Len(); i++ {
-					fieldvalue = slicevalue.Index(i).Interface()
-					ss := CreateModelStructs(fieldvalue)
-					field := ss.Field(ToCamel(subfield))
-					objValue.Elem().Index(i).Set(reflect.ValueOf(field.Value()))
+			if sliceIdx != "*" {
+				idx, _ := strconv.ParseInt(sliceIdx, 10, 64)
+				if slicevalue.Len() < int(idx) {
+					return nil, fmt.Errorf("slice idx overflow %s", field.Name())
 				}
-				return objValue.Elem().Interface(), nil
+				fieldvalue = slicevalue.Index(int(idx)).Interface()
+			} else if slicevalue.Len() > 0 {
+				fieldvalue = slicevalue.Index(0).Interface()
 			}
-			if slicevalue.Len() < sliceIdx {
-				return nil, fmt.Errorf("slice idx overflow %s", field.Name())
+		default:
+			if len(sliceIdx) > 0 {
+				return nil, fmt.Errorf("field %s is not slice", field.Name())
 			}
-			fieldvalue = slicevalue.Index(sliceIdx).Interface()
 		}
 		ss := CreateModelStructs(fieldvalue)
+		list.isSlice = tk.KindOfField == reflect.Slice
+		fieldNewList := &fieldList{
+			dst:       list.dst,
+			fieldStrs: ss,
+			parent:    list,
+		}
 		p := strings.Join(vv[1:], ".")
-		return ss.getValue(p)
+		return fieldNewList.getValue(p)
 	}
-	param = strings.ReplaceAll(param, "`", "")
-	if f, ok := s.FieldOk(ToCamel(param)); ok {
+	fieldName := param
+	sliceIdx := ""
+	if i := strings.Index(fieldName, "["); i > 0 {
+		b := strings.Index(fieldName, "]")
+		sliceIdx = fieldName[i+1 : b]
+		fieldName = fieldName[:i]
+	}
+	if f, ok := list.fieldStrs.FieldOk(ToCamel(fieldName)); ok {
 		if f.IsZero() {
 			return nil, nil
 		}
@@ -335,6 +348,66 @@ func (s *Structs) getValue(param string) (interface{}, error) {
 		if tk.KindOfField == reflect.Interface {
 			return reflect.ValueOf(f.Value()).Elem().Interface(), nil
 		}
+		if tk.KindOfField == reflect.Slice && list.dst != nil {
+			slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
+			if slicevalue.Len() == 0 {
+				return nil, nil
+			}
+			dstKind := TypeKind(list.dst)
+			if dstKind.KindOfField == reflect.Struct {
+				idx, _ := strconv.ParseInt(sliceIdx, 10, 64)
+				if slicevalue.Len() < int(idx) {
+					return nil, fmt.Errorf("slice idx overflow %s", f.Name())
+				}
+				fieldvalue := slicevalue.Index(int(idx)).Interface()
+				if dstKind.ModelName != tk.ModelName {
+					src := CreateModelStructs(fieldvalue)
+					ss := dstKind.Create()
+					ss.Copy(src)
+					return ss.raw, nil
+				}
+				return fieldvalue, nil
+			} else if dstKind.KindOfField == reflect.Slice {
+				if dstKind.ModelName == tk.ModelName {
+					return slicevalue.Interface(), nil
+				}
+				//同为切片，但结构体不一样。复制。
+				ty := DereferenceType(dstKind.TypeOfField.Elem())
+				if ty.Kind() == reflect.Struct {
+					objValue := makeSlice(dstKind.TypeOfField, slicevalue.Len())
+					for i := 0; i < slicevalue.Len(); i++ {
+						fieldvalue := slicevalue.Index(i).Interface()
+						src := CreateModelStructs(fieldvalue)
+						ss := dstKind.Create()
+						ss.Copy(src)
+						objValue.Elem().Index(i).Set(reflect.ValueOf(ss.raw))
+					}
+					return objValue.Elem().Interface(), nil
+				}
+			}
+			return nil, fmt.Errorf("model does not match %s", f.Name())
+		}
+
+		// Fields[*].Name -> []string 取所有切片的字段
+		if list.dst != nil && list.parent != nil && (tk.KindOfField >= reflect.Bool && tk.KindOfField <= reflect.Float64 ||
+			tk.KindOfField == reflect.String) && TypeKind(list.dst).KindOfField == reflect.Slice && list.parent.isSlice {
+			slicevalue := DereferenceValue(reflect.ValueOf(list.parent.field.Value()))
+			if slicevalue.Len() == 0 {
+				return nil, nil
+			}
+			fieldvalue := slicevalue.Index(0).Interface()
+			ss := CreateModelStructs(fieldvalue)
+			field := ss.Field(f.Name())
+			objValue := makeSlice(TypeKind(field).TypeOfField, slicevalue.Len())
+			for i := 0; i < slicevalue.Len(); i++ {
+				fieldvalue = slicevalue.Index(i).Interface()
+				ss := CreateModelStructs(fieldvalue)
+				field := ss.Field(f.Name())
+				objValue.Elem().Index(i).Set(reflect.ValueOf(field.Value()))
+			}
+			return objValue.Elem().Interface(), nil
+		}
+
 		if tk.KindOfField >= reflect.Int && tk.KindOfField <= reflect.Float32 {
 			// 表达式比较只能返回float64
 			v := DereferenceValue(reflect.ValueOf(f.Value()))
@@ -343,6 +416,17 @@ func (s *Structs) getValue(param string) (interface{}, error) {
 		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 	}
 	return param, nil
+}
+
+// param可能是字段，也可能普通字符串. 如果非字段，则返回该param
+// param可能包含及联，则遇到slice的时候，默认读取第一个。
+// params like: name=username id=1 id=product.id id=product.data.id
+// name=function('abcd')
+func (s *Structs) getValue(param string) (interface{}, error) {
+	list := &fieldList{
+		fieldStrs: s,
+	}
+	return list.getValue(param)
 }
 
 // GetRelationsWithModel fieldname (elem) must struct -> email = user

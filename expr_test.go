@@ -64,6 +64,7 @@ type UserResult struct {
 
 type Test struct {
 	UserSlice  []*User
+	UserSlice2  []*User
 	UserResult []*UserResult
 	User1      *User
 	User       *User
@@ -122,11 +123,12 @@ func TestExpr(t *testing.T) {
 	//	should.Nil(kitty.Eval(s, db, s.Field("User1"), "vf(this.age==10?'error iii')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(this==nil?'error')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=user1.name,age=user1.age,department=dev')|vf(this.name=='huang'?'errorr')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='huang'?'name=`bill`,age=`20`,department=`sales`')|vf(this.name=='bill'?'errorr')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_update('name=`billgates`,age=0','name=bill')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='huang'?'name=[bill],age=[20],department=[sales]')|vf(this.name=='bill'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_update('name=billgates,age=0','name=bill')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Company"), "vf(company==nil?'error')|rd_create('name=oracle,job=hr,user_id=user.id')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(company!=nil?'error')|rd_update_if(company!=nil?'department=company.name','name=billgates')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'xxx')"))
+	should.Nil(kitty.Eval(s, db, s.Field("UserSlice2"), "f('user_slice')|vf(len(this)==2?'xxx')"))
 	should.Nil(kitty.Eval(s, db, s.Field("FindByName"), "f('user_slice[*].name')|vf(len(this)==2?'xxx')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserResult"), "f('user_slice')|vf(len(this)==2&&user_result[0].name=='huang'?'error1')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User1"), "f('user_slice[0]')|vf(this!=nil&&this.name=='huang'?'error')"))
@@ -174,7 +176,7 @@ func TestCreate(t *testing.T) {
 	s := kitty.CreateModel("Test")
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=huang,age=10,department=dev')|vf(this.name=='huang'?'errorr')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create('name=bill,age=20,department=sales')|vf(this.name=='bill'?'errorr')"))
-	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='bill'?'name=`billgates`,age=`30`,department=`sales`')|vf(this.name=='billgates'?'errorr')"))
+	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_create_if(this.name=='bill'?'name=billgates,age=30,department=sales')|vf(this.name=='billgates'?'errorr')"))
 }
 
 func TestRds(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/structs"
@@ -29,7 +28,7 @@ type expr struct {
 func (e *expr) init() {
 	e.params["nil"] = nil
 	e.params["s"] = e.s.raw
-	
+
 	functions := e.functions
 	for k, v := range exprFuncs {
 		functions[k] = v
@@ -150,61 +149,11 @@ func (e *expr) init() {
 
 	functions["f"] = func(args ...interface{}) (interface{}, error) {
 		strfield := args[0].(string)
-		if strings.Contains(strfield, ".") { //xxx.xx.x or xxx[0].xx.x
-			return e.s.getValue(strfield)
+		list := &fieldList{
+			dst:       e.f,
+			fieldStrs: e.s,
 		}
-		sliceIdx := -1
-		if i := strings.Index(strfield, "["); i > 0 {
-			b := strings.Index(strfield, "]")
-			str := strfield[i+1 : b]
-			strfield = strfield[:i]
-			idx, _ := strconv.ParseInt(str, 10, 64)
-			sliceIdx = int(idx)
-		}
-		if f, ok := e.s.FieldOk(ToCamel(strfield)); ok {
-			if f.IsZero() {
-				return nil, nil
-			}
-			fk := TypeKind(f)
-			if fk.KindOfField == reflect.Slice {
-				thiskind := TypeKind(e.f)
-				if thiskind.KindOfField == reflect.Struct {
-					slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
-					if slicevalue.Len() < sliceIdx {
-						return nil, fmt.Errorf("slice idx overflow %s", f.Name())
-					}
-					fieldvalue := slicevalue.Index(sliceIdx).Interface()
-					if thiskind.ModelName != fk.ModelName {
-						src := CreateModelStructs(fieldvalue)
-						ss := thiskind.Create()
-						ss.Copy(src)
-						return ss.raw, nil
-					}
-					return fieldvalue, nil
-				} else if thiskind.KindOfField == reflect.Slice {
-					//同为切片，但结构体不一样。复制。
-					ty := DereferenceType(thiskind.TypeOfField.Elem())
-					if ty.Kind() == reflect.Struct {
-						slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
-						objValue := makeSlice(thiskind.TypeOfField, slicevalue.Len())
-						for i := 0; i < slicevalue.Len(); i++ {
-							fieldvalue := slicevalue.Index(i).Interface()
-							src := CreateModelStructs(fieldvalue)
-							ss := thiskind.Create()
-							ss.Copy(src)
-							objValue.Elem().Index(i).Set(reflect.ValueOf(ss.raw))
-						}
-						return objValue.Elem().Interface(), nil
-					}
-					return nil, fmt.Errorf("model does not match %s", strfield)
-				}
-			}
-			if fk.KindOfField == reflect.Interface {
-				return reflect.ValueOf(f.Value()).Elem().Interface(), nil
-			}
-			return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
-		}
-		return nil, fmt.Errorf("$ unknown field %s", strfield)
+		return list.getValue(strfield)
 	}
 	functions["set"] = func(args ...interface{}) (interface{}, error) {
 		return args[0], nil

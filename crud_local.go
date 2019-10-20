@@ -30,15 +30,12 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			var buf [4096]byte
 			n := runtime.Stack(buf[:], false)
 			fmt.Printf("Action: %s==> %s\n", action, string(buf[:n]))
-			if tx != nil {
-				tx.Rollback()
-			}
+			tx.Rollback()
+
 		}
 	}()
 
-	if tx != nil {
-		tx = tx.Begin()
-	}
+	tx = tx.Begin()
 
 	s := local.strs
 	if s == nil {
@@ -66,8 +63,6 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	})
 
 	switch action {
-	case "RPC":
-	//	res, err = crud.execRPC()
 	case "C":
 		res, err = crud.createObj()
 	case "R":
@@ -78,12 +73,10 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		return nil, errors.New("unknown model action")
 	}
 
-	if tx != nil {
-		if err == nil {
-			err = tx.Commit().Error
-		} else {
-			tx.Rollback()
-		}
+	if err == nil {
+		err = tx.Commit().Error
+	} else {
+		tx.Rollback()
 	}
 
 	if err == nil {
