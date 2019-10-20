@@ -65,7 +65,7 @@ func (web *CRUDWeb) CallRPC2(w http.ResponseWriter, r *http.Request) {
 	c1 := &kitty.API{
 		Crud:   web.Crud,
 		Params: web.Params,
-		Ctx:    &ginCtx{c: c, ctx: web.Ctx},
+		Ctx:    &nativeCtx{c: r.Context(), ctx: web.Ctx},
 	}
-	web.result(c1.CallRPC, &ginResponse{C: c})
+	web.result(c1.CallRPC, &nativeResponse{W: w})
 }
