@@ -566,7 +566,8 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}
 }
 
-func (s *Structs) copy(src *Structs) {
+// Copy Structs
+func (s *Structs) Copy(src *Structs) {
 	for _, f := range s.Fields() {
 		// Name string `alias:"" getter:"set(xxx(f('aaabcd')))"`
 		fname := f.Name()
@@ -583,7 +584,7 @@ func (s *Structs) copy(src *Structs) {
 		if alias := f.Tag("alias"); len(alias) > 0 {
 			v := strings.Split(alias, ",")
 			for _, field := range v {
-				if setValue(ToCamel(field)) {
+				if setValue(field) {
 					bok = true
 					break
 				}

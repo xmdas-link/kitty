@@ -177,7 +177,7 @@ func (e *expr) init() {
 					if thiskind.ModelName != fk.ModelName {
 						src := CreateModelStructs(fieldvalue)
 						ss := thiskind.create()
-						ss.copy(src)
+						ss.Copy(src)
 						return ss.raw, nil
 					}
 					return fieldvalue, nil
@@ -191,7 +191,7 @@ func (e *expr) init() {
 							fieldvalue := slicevalue.Index(i).Interface()
 							src := CreateModelStructs(fieldvalue)
 							ss := thiskind.create()
-							ss.copy(src)
+							ss.Copy(src)
 							objValue.Elem().Index(i).Set(reflect.ValueOf(ss.raw))
 						}
 						return objValue.Elem().Interface(), nil

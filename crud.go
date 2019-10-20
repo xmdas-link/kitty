@@ -1,9 +1,15 @@
 package kitty
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
+
+	kittyrpc "github.com/xmdas-link/kitty/rpc/proto/kittyrpc"
+
+	"github.com/iancoleman/strcase"
 
 	"github.com/Knetic/govaluate"
 	vd "github.com/bytedance/go-tagexpr/validator"
@@ -347,7 +353,16 @@ func (crud *crud) execRPC() (interface{}, error) {
 		}
 		return nil
 	}
-
+	/*
+		var getrpc2 = func(methodField string) *rpc {
+			for _, v := range rpcs {
+				if v.methodField == methodField {
+					return v
+				}
+			}
+			return nil
+		}
+	*/
 	for _, f := range s.Fields() {
 		if k := f.Tag("kitty"); len(k) > 0 {
 			tk := TypeKind(f)
@@ -369,7 +384,7 @@ func (crud *crud) execRPC() (interface{}, error) {
 				}
 				v := strings.Split(protocol, ".")
 				rpc := getrpc(v[0], v[1])
-				rpc.methodField = f.Name()
+				rpc.methodField = f.Name() // PageRequest DeviceRequest KittyPersonRequest
 				rpc.param = methodStrs
 			}
 		}
@@ -377,28 +392,76 @@ func (crud *crud) execRPC() (interface{}, error) {
 
 	for _, rpc := range rpcs {
 		//	SchoolId      *uint             `json:"-" kitty:"param:PageRequest.SchoolId;runtime:set(0)"`
-		paramformat := fmt.Sprintf("%s.", rpc.methodField)
+		paramformat := fmt.Sprintf("%s.", rpc.methodField) // PageRequest DeviceRequest
+		paramStrs := rpc.param
+		isKittyRequest := false
 		for _, f := range s.Fields() {
 			if k := f.Tag("kitty"); len(k) > 0 {
-				if param := GetSub(k, "param"); len(param) > 0 && strings.Contains(param, paramformat) {
-					if runtime := GetSub(k, "runtime"); len(runtime) > 0 {
-						expr := &expr{
-							s:         s,
-							f:         f,
-							functions: make(map[string]govaluate.ExpressionFunction),
-							params:    make(map[string]interface{}),
+				if param := GetSub(k, "param"); len(param) > 0 {
+					v := strings.Split(param, ".")
+					if v[1] == "Model" { // like KittyPersonRequest.Model; for kitty rpc request param->model
+						paramformat = fmt.Sprintf("%s.", f.Name()) // param:ModelPerson.xxx
+						tk := TypeKind(f)
+						paramStrs = tk.create()
+						if err := f.Set(paramStrs.raw); err != nil {
+							return nil, err
 						}
-						expr.init()
-						if err := expr.eval(runtime); err != nil {
+						rpc.param.Field("Model").Set(tk.ModelName)
+						isKittyRequest = true
+						continue
+					}
+					if strings.Contains(param, paramformat) {
+						if runtime := GetSub(k, "runtime"); len(runtime) > 0 {
+							expr := &expr{
+								s:         s,
+								f:         f,
+								functions: make(map[string]govaluate.ExpressionFunction),
+								params:    make(map[string]interface{}),
+							}
+							expr.init()
+							if err := expr.eval(runtime); err != nil {
+								return nil, err
+							}
+						}
+						ff := paramStrs.Field(v[1])
+						if err := paramStrs.SetFieldValue(ff, f.Value()); err != nil {
 							return nil, err
 						}
 					}
-					v := strings.Split(param, ".")
-					ff := rpc.param.Field(v[1])
-					if err := rpc.param.SetFieldValue(ff, f.Value()); err != nil {
-						return nil, err
+				}
+			}
+			if isKittyRequest {
+				// format search condition.
+				form := make(map[string][]string)
+				for _, f := range paramStrs.Fields() {
+					if k := f.Tag("kitty"); len(k) > 0 && strings.Contains(k, "param:") && !strings.Contains(k, "-;param") {
+						x := ""
+						rv := DereferenceValue(reflect.ValueOf(f.Value()))
+						if rv.Kind() >= reflect.Bool && rv.Kind() <= reflect.Float64 {
+							x = fmt.Sprintf("%v", rv)
+						} else if rv.Kind() == reflect.String {
+							x = rv.Interface().(string)
+						}
+						if len(x) == 0 {
+							continue
+						}
+						name := strcase.ToSnake(f.Name())
+						if v := form[name]; v == nil {
+							form[name] = []string{}
+						}
+						v := form[name]
+						v = append(v, x)
+						form[name] = v
 					}
 				}
+				search := &SearchCondition{
+					FormValues: form,
+				}
+				res, err := json.Marshal(search)
+				if err != nil {
+					return nil, err
+				}
+				rpc.param.Field("Search").Set(string(res))
 			}
 		}
 		values := rpc.client.CallMethod(rpc.method, reflect.ValueOf(ctx), reflect.ValueOf(rpc.param.raw))
@@ -406,7 +469,23 @@ func (crud *crud) execRPC() (interface{}, error) {
 		if err := values[1].Interface().(error); err != nil {
 			return nil, err
 		}
-		if err := rpc.result.Set(values[0].Interface()); err != nil {
+
+		rspValue := values[0].Interface()
+		if rpc.method == "Call" {
+			rpcrsp := rspValue.(*kittyrpc.Response)
+			if len(rpcrsp.Msg) > 0 {
+				res := &CrudResult{}
+				if err := json.Unmarshal([]byte(rpcrsp.Msg), res); err != nil {
+					return nil, err
+				}
+				if res.Code != 1 {
+					return nil, errors.New(res.Message)
+				}
+				rspValue = res.Data
+			}
+		}
+
+		if err := rpc.result.Set(rspValue); err != nil {
 			return nil, err
 		}
 
