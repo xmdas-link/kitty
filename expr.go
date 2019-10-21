@@ -302,7 +302,7 @@ func (e *expr) init() {
 			if len(argv) > 0 {
 				if v := strings.Split(argv, ","); len(v) > 0 {
 					for _, expression := range v {
-						operators := []string{" LIKE ", "<>", ">=", "<=", ">", "<", "=", "IN"}
+						operators := []string{" LIKE ", "<>", ">=", "<=", ">", "<", "=", " IN "}
 
 						for _, oper := range operators {
 							if strings.Contains(expression, oper) {
