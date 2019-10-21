@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Knetic/govaluate"
 	"github.com/iancoleman/strcase"
 	"github.com/modern-go/reflect2"
 
@@ -681,14 +680,7 @@ func (s *Structs) Copy(src *Structs) {
 		if !bok {
 			if !setValue(fname) {
 				if get := f.Tag("getter"); len(get) > 0 {
-					expr := &expr{
-						s:         s,
-						f:         f,
-						functions: make(map[string]govaluate.ExpressionFunction),
-						params:    make(map[string]interface{}),
-					}
-					expr.init()
-					expr.eval(get)
+					Eval(s, nil, f, get)
 				}
 			}
 		}

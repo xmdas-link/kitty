@@ -105,7 +105,7 @@ func (ks *kittys) parse(ms *Structs) error {
 			ks.binds = append(ks.binds, binding)
 		}
 	}
-	
+
 	return nil
 }
 func (ks *kittys) check() error {
@@ -160,6 +160,16 @@ func (ks *kittys) selects() *fieldQryFormat {
 		bindfield: strings.Join(s, ", "),
 		value:     value,
 	}
+}
+
+func (ks *kittys) selectForCount() string {
+	s := []string{}
+	for _, v := range ks.binds {
+		if l := v.selectAs(); len(l) > 0 {
+			s = append(s, v.selectAs())
+		}
+	}
+	return strings.Join(s, ", ")
 }
 
 func (ks *kittys) joins() []*fieldQryFormat {

@@ -68,6 +68,9 @@ func (f *fieldBinding) selects(ms *Structs, db *gorm.DB) *fieldQryFormat {
 }
 
 func (f *fieldBinding) selectAs() string {
+	if f.exprString {
+		return ""
+	}
 	if len(f.Format) > 0 {
 		format := strings.Replace(f.Format, "$", f.tableWithFieldName(), -1)
 		return fmt.Sprintf("%s AS %s", format, strcase.ToSnake(f.FieldName))

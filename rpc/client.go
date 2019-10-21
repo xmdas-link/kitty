@@ -173,10 +173,14 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 								return nil, err
 							}
 						}
-						ff := paramStrs.Field(v[1])
-						if err := paramStrs.SetFieldValue(ff, f.Value()); err != nil {
-							return nil, err
+						if ff, ok := paramStrs.FieldOk(v[1]); ok {
+							if err := paramStrs.SetFieldValue(ff, f.Value()); err != nil {
+								return nil, err
+							}
+						} else {
+							return nil, fmt.Errorf("%s field %s not exist", v[0], v[1])
 						}
+
 					}
 				}
 			}
@@ -234,6 +238,12 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 					return nil, errors.New(res.Message)
 				}
 				rspValue = res.Data
+				obj, _ := json.Marshal(res.Data)
+				tk := kitty.TypeKind(rpc.result)
+				rspValue := tk.Create().Raw()
+				if err := json.Unmarshal(obj, rspValue); err != nil {
+					return nil, fmt.Errorf("rpc call %s parse error", rpc.name)
+				}
 			}
 		}
 
