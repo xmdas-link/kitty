@@ -302,14 +302,14 @@ func (e *expr) init() {
 			if len(argv) > 0 {
 				if v := strings.Split(argv, ","); len(v) > 0 {
 					for _, expression := range v {
-						operators := []string{" LIKE ", "<>", ">=", "<=", ">", "<", "="}
+						operators := []string{" LIKE ", "<>", ">=", "<=", ">", "<", "=", "IN"}
 
 						for _, oper := range operators {
 							if strings.Contains(expression, oper) {
 								vv := strings.Split(expression, oper)
 								fname := strcase.ToSnake(trimSpace(vv[0]))
 								param := trimSpace(vv[1])
-								if param[0] == '[' && param[len(param)-1] == ']' {
+								if len(param) > 2 && param[0] == '[' && param[len(param)-1] == ']' {
 									tx = tx.Where(fmt.Sprintf("%s %s %s", fieldAs(fname), oper, param[1:len(param)-1]))
 								} else {
 									res, err := e.s.getValue(param)

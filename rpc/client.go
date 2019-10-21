@@ -92,8 +92,8 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 		return nil, err
 	}
 	var (
-		ctx        = c.GetCtx()
-		rpcClients = search.Params
+		ctx       = c.GetCtx()
+		rpcParams = search.Params
 	)
 
 	type localRPC struct {
@@ -108,7 +108,7 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 	if err := vd.Validate(s.Raw()); err != nil {
 		return nil, err
 	}
-	if err := kitty.Getter(s, make(map[string]interface{}), nil, c); err != nil {
+	if err := kitty.Getter(s, rpcParams, nil, c); err != nil {
 		return nil, err
 	}
 
@@ -130,7 +130,7 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 				v := strings.Split(call, ".")
 				rpcs = append(rpcs, &localRPC{
 					name:   v[0],
-					client: kitty.CreateModelStructs(rpcClients[v[0]]),
+					client: kitty.CreateModelStructs(rpcParams[v[0]]),
 					method: v[1],
 					result: f,
 				})
@@ -242,7 +242,7 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 		}
 
 	}
-	if err := kitty.Setter(s, make(map[string]interface{}), nil, c); err != nil {
+	if err := kitty.Setter(s, rpcParams, nil, c); err != nil {
 		return nil, err
 	}
 

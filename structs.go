@@ -262,7 +262,7 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 			return err
 		}
 		if str, ok := value.(string); ok {
-			if str[0] == '[' && str[len(str)-1] == ']' {
+			if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
 				value = str[1 : len(str)-1]
 			}
 		}
@@ -284,7 +284,7 @@ type fieldList struct {
 }
 
 func (list *fieldList) getValue(param string) (interface{}, error) {
-	if param[0] == '[' && param[len(param)-1] == ']' {
+	if len(param) > 2 && param[0] == '[' && param[len(param)-1] == ']' {
 		return param, nil
 	}
 	if strings.Contains(param, ".") {
@@ -305,6 +305,7 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 		tk := TypeKind(field)
 		switch tk.KindOfField {
 		case reflect.Slice: // field[0].Name
+			list.isSlice = true
 			if len(sliceIdx) == 0 {
 				return nil, fmt.Errorf("field %s slice index error", field.Name())
 			}
@@ -324,7 +325,6 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 			}
 		}
 		ss := CreateModelStructs(fieldvalue)
-		list.isSlice = tk.KindOfField == reflect.Slice
 		fieldNewList := &fieldList{
 			dst:       list.dst,
 			fieldStrs: ss,
@@ -647,7 +647,7 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 		return &fieldQryFormat{operator: fmt.Sprintf("%s (?)", operator), value: []interface{}{singleValue.Interface()}}
 	}
 	if str, ok := singleValue.Interface().(string); ok {
-		if str[0] == '[' && str[len(str)-1] == ']' {
+		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
 			return &fieldQryFormat{operator: fmt.Sprintf("%s %s", operator, str[1:len(str)-1])}
 		}
 	}
