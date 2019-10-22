@@ -31,6 +31,14 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 	if err != nil {
 		return err
 	}
+	if rpc.DB == nil {
+		obj, err := rpc.Ctx.GetCtxInfo(ctx)
+		if err == nil {
+			rpc.DB = obj.(*gorm.DB)
+		} else {
+			return err
+		}
+	}
 
 	crud := &kitty.LocalCrud{
 		Model:  req.Model,
