@@ -4,14 +4,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/iancoleman/strcase"
-
 	"github.com/Knetic/govaluate"
 	"github.com/jinzhu/gorm"
 )
 
 type qry interface {
-	prepare() *gorm.DB
+	query() *gorm.DB
 	multi() (interface{}, error)
 	one() (interface{}, error)
 }
@@ -20,6 +18,7 @@ type update interface {
 	update() error
 }
 
+// Getter before execute
 func Getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
 	expr := &expr{
 		db:        db,
@@ -41,6 +40,7 @@ func Getter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) er
 	return nil
 }
 
+// Setter after execute successful
 func Setter(s *Structs, param map[string]interface{}, db *gorm.DB, c Context) error {
 	expr := &expr{
 		db:        db,
@@ -96,40 +96,6 @@ func evalJoin(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) 
 		Having:       kittys.having(),
 		order:        kittys.order(),
 	}
-}
-
-func evalSimpleQry(s *Structs, kittys *kittys, search *SearchCondition, db *gorm.DB) qry {
-	modelName := strcase.ToSnake(kittys.master().ModelName)
-	var qryformats []*fieldQryFormat
-	var order []*fieldQryFormat
-	for _, v := range s.buildAllParamQuery() {
-		if v.model == modelName {
-			if v.order {
-				order = append(order, v)
-			} else {
-				qryformats = append(qryformats, v)
-			}
-		}
-	}
-	scan := false
-
-	// 如果结果的模型不同于master，则用scan方法。
-	if kittys.master().ModelName != kittys.result.Name() {
-		scan = true
-	}
-
-	q := &query{
-		db:           db,
-		search:       search,
-		ModelStructs: kittys.result,
-		queryString:  qryformats,
-		order:        order,
-		scan:         scan,
-	}
-	if len(kittys.binds) > 0 && kittys.binds[0] != nil {
-		q.fieldselect = kittys.binds[0].BindModelField
-	}
-	return q
 }
 
 func execqry(q qry, multi bool) (interface{}, error) {

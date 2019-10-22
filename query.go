@@ -1,8 +1,6 @@
 package kitty
 
 import (
-	"reflect"
-
 	"github.com/jinzhu/gorm"
 )
 
@@ -42,8 +40,8 @@ func (q *query) one() (interface{}, error) {
 }
 
 func (q *query) multi() (interface{}, error) {
-	tx := q.prepare()
-	objValue := makeSlice(reflect.TypeOf(q.ModelStructs.raw), 0)
-	result := objValue.Interface()
-	return pages(tx, q.search, result, q.scan)
+	//	tx := q.prepare()
+	//	objValue := makeSlice(reflect.TypeOf(q.ModelStructs.raw), 0)
+	//	result := objValue.Interface()
+	return nil, nil //pages(tx, q.search, result, q.scan)
 }

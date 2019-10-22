@@ -184,35 +184,50 @@ func (e *expr) init() {
 			}
 			return nil, nil
 		}
-		db := e.db
 		argv := args[0].(string)
+		queryformat := []*fieldQryFormat{}
 		v := strings.Split(argv, ",")
-		ss := tk.Create()
-		if err := ss.fillValue(e.s, v); err != nil {
-			return nil, err
+		for _, expression := range v {
+			if strings.Contains(expression, "=") {
+				vv := strings.Split(expression, "=")
+				param := trimSpace(vv[1])
+				res, err := e.s.getValue(param)
+				if err != nil {
+					return nil, err
+				}
+				if res == nil {
+					continue
+				}
+				fname := strcase.ToSnake(trimSpace(vv[0]))
+				queryformat = append(queryformat, &fieldQryFormat{
+					bindfield: fname,
+					model:     strcase.ToSnake(tk.ModelName),
+					operator:  "= ?",
+					value:     []interface{}{res},
+				})
+			}
 		}
-
-		err := db.Create(ss.raw).Error
-		if err == nil {
-			return ss.raw, nil
+		qry := &simpleQuery{
+			db:           e.db,
+			ModelStructs: e.s,
+			search:       &SearchCondition{},
+			Result:       tk.Create(),
+			qryParams:    queryformat,
 		}
-		return nil, err
+		return qry.create()
 	}
 
 	//更新单条记录  格式  update:xx=xx, where: xx=xx
 	functions["rd_update"] = func(args ...interface{}) (interface{}, error) {
-		tx := e.db
 		updateCondition := args[0].(string)
 		whereCondition := args[1].(string)
 
 		tk := TypeKind(e.f)
-		sUpdate := tk.Create()
-		tx = tx.Model(sUpdate.raw)
 
+		queryformat := []*fieldQryFormat{}
 		vWhere := strings.Split(whereCondition, ",")
 		for _, expression := range vWhere {
 			operators := []string{" LIKE ", "<>", ">=", "<=", ">", "<", "="}
-
 			for _, oper := range operators {
 				if strings.Contains(expression, oper) {
 					vv := strings.Split(expression, oper)
@@ -222,14 +237,17 @@ func (e *expr) init() {
 						return nil, err
 					}
 					fname := strcase.ToSnake(trimSpace(vv[0]))
-					tx = tx.Where(fmt.Sprintf("%s %s ?", fname, oper), res)
+					queryformat = append(queryformat, &fieldQryFormat{
+						bindfield:     fname,
+						model:         strcase.ToSnake(tk.ModelName),
+						withCondition: true,
+						operator:      oper + " ?",
+						value:         []interface{}{res},
+					})
 					break
 				}
 			}
 		}
-
-		updates := make(map[string]interface{})
-
 		vUpdate := strings.Split(updateCondition, ",")
 		for _, expression := range vUpdate {
 			if strings.Contains(expression, "=") {
@@ -240,14 +258,30 @@ func (e *expr) init() {
 					return nil, err
 				}
 				fname := strcase.ToSnake(trimSpace(vv[0]))
-				updates[fname] = res
+				queryformat = append(queryformat, &fieldQryFormat{
+					bindfield: fname,
+					model:     strcase.ToSnake(tk.ModelName),
+					operator:  "= ?",
+					value:     []interface{}{res},
+				})
 			}
 		}
 
-		if err := tx.Updates(updates).Error; err != nil {
-			return nil, err
+		var supdate *Structs
+		if e.f.IsZero() {
+			supdate = tk.Create()
+			e.f.Set(supdate.raw)
+		} else {
+			supdate = CreateModelStructs(e.f.Value())
 		}
-		return nil, nil
+		qry := &simpleQuery{
+			db:           e.db,
+			ModelStructs: e.s,
+			search:       &SearchCondition{},
+			Result:       supdate,
+			qryParams:    queryformat,
+		}
+		return nil, qry.update()
 	}
 
 	// rds:  rds('key=value','user,a.field,field') 第二项不是必填项。
@@ -320,28 +354,6 @@ func (e *expr) init() {
 								}
 								break
 							}
-						}
-					}
-				}
-			}
-		}
-
-		if ks := e.params["kittys"]; ks != nil {
-			if kk, ok := ks.(*kittys); ok {
-				if subqry := kk.subWhere(model); len(subqry) > 0 {
-					for _, v := range subqry {
-						tx = tx.Where(v.whereExpr(), v.value...)
-					}
-				}
-				j := kk.get(model)
-				if j != nil && len(j.JoinTo) > 0 {
-					joinTo := kk.get(j.JoinTo)
-					ms := e.params["ms"].(*Structs)
-					if fi, err := ms.GetRelationsWithModel(j.FieldName, joinTo.ModelName); err == nil {
-						if fi.Relationship != "nothing" {
-							associationKey := strcase.ToSnake(fi.ForeignKey)
-							field := e.s.Field(joinTo.ModelName).Field(ToCamel(fi.AssociationForeignkey))
-							tx = tx.Where(fmt.Sprintf("%s = ?", associationKey), field.Value())
 						}
 					}
 				}

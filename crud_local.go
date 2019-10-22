@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	jsoniter "github.com/json-iterator/go"
 )
@@ -97,6 +98,12 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			nameAs,
 			jsoniter.Config{}.Froze(),
 		}, nil
+	}
+	if _, ok := err.(*mysql.MySQLError); ok {
+		if kittyMode == debugCode {
+			return nil, err
+		}
+		return nil, errors.New("数据库执行错误")
 	}
 	return nil, err
 }

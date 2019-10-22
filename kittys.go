@@ -40,10 +40,10 @@ func (ks *kittys) parse(ms *Structs) error {
 			if f.Kind() == reflect.Struct {
 				tk := TypeKind(f)
 				strs := tk.Create()
-				modelName := tk.ModelName
+				modelname := tk.ModelName
 				kitty := &kitty{
 					ModelStructs: ks.ModelStructs,
-					ModelName:    modelName,
+					ModelName:    modelname,
 					FieldName:    f.Name(),
 					structs:      strs,
 					//	TableName:    ks.db.NewScope(strs.raw).TableName(),
@@ -51,7 +51,7 @@ func (ks *kittys) parse(ms *Structs) error {
 				if !isKitty(strs) {
 					kitty.TableName = ks.db.NewScope(strs.raw).TableName()
 				}
-				kitty.parse(k, modelName, f.Name())
+				kitty.parse(k, modelname, f.Name())
 				ks.kittys = append(ks.kittys, kitty)
 			}
 		}
@@ -89,14 +89,14 @@ func (ks *kittys) parse(ms *Structs) error {
 			if strings.Contains(modelField, "(") && strings.Contains(modelField, ")") {
 				kitty.ModelName = tk.ModelName
 			} else {
-				modelName := ToCamel(strings.Split(modelField, ".")[0])
+				modelname := ToCamel(strings.Split(modelField, ".")[0])
 				var strs *Structs
-				if modelName == tk.ModelName {
+				if modelname == tk.ModelName {
 					strs = tk.Create()
 				} else {
-					strs = ms.createModel(modelName)
+					strs = ms.createModel(modelname)
 				}
-				kitty.ModelName = modeName
+				kitty.ModelName = modelname
 				if !isKitty(strs) {
 					kitty.TableName = ks.db.NewScope(strs.raw).TableName()
 				}
@@ -176,11 +176,7 @@ func (ks *kittys) joins() []*fieldQryFormat {
 	s := []*fieldQryFormat{}
 	for _, v := range ks.kittys {
 		if !v.Master {
-			//			if isKitty(v.structs) {
-			//				s = append(s, v.joinKitty(ks.ModelStructs, ks.get(v.JoinTo), ks.db, ks.ctx))
-			//			} else {
 			s = append(s, v.joins(ks.ModelStructs, ks.get(v.JoinTo)))
-			//			}
 		}
 	}
 	return s
@@ -246,15 +242,4 @@ func (ks *kittys) order() []*fieldQryFormat {
 		}
 	}
 	return s
-}
-
-func (ks *kittys) subWhere(model string) []*fieldQryFormat {
-	for _, bind := range ks.binds {
-		if bind.ModelName == ToCamel(model) {
-			if q := ks.ModelStructs.buildFormQuery(bind.TableName, bind.ModelName); q != nil {
-				return q
-			}
-		}
-	}
-	return nil
 }

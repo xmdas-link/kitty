@@ -91,10 +91,11 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 	if err := s.ParseFormValues(search.FormValues); err != nil {
 		return nil, err
 	}
+
 	var (
-		ctx       = c.GetCtx()
 		rpcParams = search.Params
 	)
+	ctx, _ := c.GetCtxInfo("ContextRPC")
 
 	type localRPC struct {
 		name        string
@@ -237,10 +238,8 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 				if res.Code != 1 {
 					return nil, errors.New(res.Message)
 				}
-				rspValue = res.Data
 				obj, _ := json.Marshal(res.Data)
-				tk := kitty.TypeKind(rpc.result)
-				rspValue := tk.Create().Raw()
+				rspValue = kitty.TypeKind(rpc.result).Create().Raw()
 				if err := json.Unmarshal(obj, rspValue); err != nil {
 					return nil, fmt.Errorf("rpc call %s parse error", rpc.name)
 				}

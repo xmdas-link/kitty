@@ -171,8 +171,9 @@ func (j *kitty) joins(s *Structs, joinTo *kitty) *fieldQryFormat {
 	}
 
 	params := []interface{}{}
-	if query := s.buildFormQuery(j.TableName, j.ModelName); len(query) > 0 {
+	if query := s.buildFormQuery(j.ModelName); len(query) > 0 {
 		for _, v := range query {
+			v.bindfield = fmt.Sprintf("%s.%s", j.TableName, v.bindfield)
 			where = append(where, v.operator)
 			params = append(params, v.value...)
 		}

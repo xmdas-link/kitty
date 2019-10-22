@@ -1,8 +1,10 @@
 package kitty
 
 import (
+	"errors"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -35,6 +37,12 @@ func (crud *RPCCrud) Do(search *SearchCondition, action string, c Context) (inte
 			nameAs,
 			jsoniter.Config{}.Froze(),
 		}, nil
+	}
+	if _, ok := err.(*mysql.MySQLError); ok {
+		if kittyMode == debugCode {
+			return nil, err
+		}
+		return nil, errors.New("数据库执行错误")
 	}
 	return res, err
 }

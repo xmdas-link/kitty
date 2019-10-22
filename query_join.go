@@ -50,6 +50,10 @@ func (q *joinQuery) end(tx *gorm.DB) *gorm.DB {
 	}
 	return tx
 }
+func (q *joinQuery) query() *gorm.DB {
+	tx := q.prepare()
+	return q.end(tx)
+}
 
 func (q *joinQuery) one() (interface{}, error) {
 	tx := q.prepare()

@@ -17,18 +17,19 @@ type simpleQuery struct {
 	ModelStructs *Structs
 	Result       *Structs
 	Next         []*simpleQuery
+	qryParams    []*fieldQryFormat
 }
 
 func (q *simpleQuery) create() (interface{}, error) {
 	modelName := strcase.ToSnake(q.Result.Name())
 
-	qryformats := q.ModelStructs.buildAllParamQuery()
+	qryformats := q.qryParams
+	qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
+
 	for _, qry := range qryformats {
-		if modelName == qry.model {
-			if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
-				if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
-					return nil, err
-				}
+		if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
+			if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -63,49 +64,68 @@ func (q *simpleQuery) update() error {
 	tx := q.db.Model(q.Result.raw)
 
 	updates := make(map[string]interface{})
+	updateWithStrs := false
 
-	qryformats := q.ModelStructs.buildAllParamQuery()
+	qryformats := q.qryParams
+	qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
+
 	for _, qry := range qryformats {
-		if modelName == qry.model {
-			if qry.withCondition || ToCamel(qry.bindfield) == "ID" {
-				whereCount++
-				w := qry.whereExpr()
-				tx = tx.Where(w, qry.value...)
-			} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
-				if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
+		if qry.withCondition || ToCamel(qry.bindfield) == "ID" {
+			whereCount++
+			w := qry.whereExpr()
+			tx = tx.Where(w, qry.value...)
+		} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
+			resvalue := qry.value[0]
+			switch f.Value().(type) {
+			case *time.Time:
+				if v, ok := resvalue.(string); ok {
+					if len(v) == 0 {
+						updates[qry.bindfield] = nil
+						continue
+					}
+				}
+				VK := reflect.ValueOf(resvalue)
+				if VK.Kind() >= reflect.Int && VK.Kind() <= reflect.Float64 {
+					v := VK.Convert(reflect.TypeOf(float64(0))).Interface().(float64)
+					if v == 0 {
+						updates[qry.bindfield] = nil
+						continue
+					}
+				}
+			}
+			if DereferenceType(reflect.TypeOf(resvalue)).Kind() == reflect.Struct {
+				if err := f.Set(resvalue); err != nil {
 					return err
 				}
-				switch f.Value().(type) {
-				case *time.Time:
-					if v, ok := qry.value[0].(string); ok {
-						if len(v) == 0 {
-							updates[qry.bindfield] = nil
-							continue
-						}
-					}
-					VK := reflect.ValueOf(qry.value[0])
-					if VK.Kind() >= reflect.Int && VK.Kind() <= reflect.Float64 {
-						v := VK.Convert(reflect.TypeOf(float64(0))).Interface().(float64)
-						if v == 0 {
-							updates[qry.bindfield] = nil
-							continue
-						}
-					}
-				}
-				updates[qry.bindfield] = f.Value()
+				updateWithStrs = true
+			} else {
+				updates[qry.bindfield] = resvalue
 			}
+		} else {
+			return fmt.Errorf("%s field error %s", modelName, qry.bindfield)
 		}
 	}
+
 	if whereCount == 0 {
 		return fmt.Errorf("unable update %s, missing query condition", modelName)
 	}
-	//tx = tx.Update(q.Result.raw)
-	tx = tx.Updates(updates)
+	if updateWithStrs {
+		tx = tx.Updates(q.Result.raw)
+		q.search.ReturnCount = int(tx.RowsAffected)
+	}
+	if len(updates) > 0 {
+		tx = tx.Updates(updates)
+		q.search.ReturnCount = int(tx.RowsAffected)
+		for k, v := range updates {
+			if f, ok := q.Result.FieldOk(ToCamel(k)); ok {
+				q.Result.SetFieldValue(f, v)
+			}
+		}
+	}
 
 	if err := tx.Error; err != nil {
 		return err
 	}
-	q.search.ReturnCount = int(tx.RowsAffected)
 
 	for _, v := range q.Next {
 		if tx.RowsAffected == 1 {

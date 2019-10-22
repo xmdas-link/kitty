@@ -5,13 +5,13 @@ import "github.com/xmdas-link/kitty"
 // FormCreateUser 创建User，表单参数定义Name Age Department
 // 参数校验： 1. 名称不能为空  2. 名称不能重复 (通过定义字段User)
 type FormCreateUser struct {
-	*User              `kitty:"bind:user.id,created_at,name,age;bindresult;"`
 	Name               *string  `json:"-" kitty:"param:user.name;" vd:"len($)>0;msg:'name required'"`
 	Age                *string  `json:"-" kitty:"param:user.age;"`
 	Department         *string  `json:"-" kitty:"param:user.department;"`
 	Salary             *float64 `json:"-" kitty:"param:user.salary;" vd:"$>0.0;msg:'salary is zero.'"`
 	TestNameDumplicate *User    `json:"-" kitty:"getter:rds('name=name')|vf(this==nil?'name duplicate')"`
-	MUser              User     `json:"-" kitty:"master"`
+	//	MUser              User     `json:"-" kitty:"master"`
+	*User `kitty:"bind:user.id,created_at,name,age;bindresult;getter:rd_create('')"`
 }
 
 // FormUpdateUser 更新user.
@@ -22,7 +22,7 @@ type FormUpdateUser struct {
 	Department         *string `json:"-" kitty:"param:user.department;"`
 	TestID             *User   `json:"-" kitty:"getter:rds('id=id')|vf(this!=nil?'id not exist')"`
 	TestNameDumplicate *User   `json:"-" kitty:"getter:rds('name=name')|vf(this==nil||this.id==id?'name duplicate')"`
-	User               User    `json:"-" kitty:"master"`
+	UserUpdate         *User   `json:"-" kitty:"getter:rd_update('','')"`
 }
 
 // FormUser 用户信息/ 参数： ID/Name 两者其一

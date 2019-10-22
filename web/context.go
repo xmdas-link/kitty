@@ -9,7 +9,7 @@ import (
 // externCtx 提供由外部定义的，根据上下文获得当前uid的登录信息
 type externCtx interface {
 	GetUID(interface{}) (string, error)
-	GetCtxInfo(interface{}, string) (string, error)
+	GetCtxInfo(interface{}, string) (interface{}, error)
 }
 
 // nativeCtx 原生上下文
@@ -22,12 +22,11 @@ func (c *nativeCtx) CurrentUID() (string, error) {
 	return c.ctx.GetUID(c.c)
 }
 
-func (c *nativeCtx) GetCtxInfo(s string) (string, error) {
+func (c *nativeCtx) GetCtxInfo(s string) (interface{}, error) {
+	if s == "ContextRPC" {
+		return c.c, nil
+	}
 	return c.ctx.GetCtxInfo(c.c, s)
-}
-
-func (c *nativeCtx) GetCtx() context.Context {
-	return c.c
 }
 
 type ginCtx struct {
@@ -40,10 +39,9 @@ func (c *ginCtx) CurrentUID() (string, error) {
 	return c.ctx.GetUID(c.c)
 }
 
-func (c *ginCtx) GetCtxInfo(s string) (string, error) {
+func (c *ginCtx) GetCtxInfo(s string) (interface{}, error) {
+	if s == "ContextRPC" {
+		return c.c.Request.Context(), nil
+	}
 	return c.ctx.GetCtxInfo(c.c, s)
-}
-
-func (c *ginCtx) GetCtx() context.Context {
-	return c.c.Request.Context()
 }

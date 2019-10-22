@@ -29,7 +29,7 @@ type FieldTypeAndKind struct {
 }
 
 // Create ..
-func (f *FieldTypeAndKind) Create() *Structs {
+func (f FieldTypeAndKind) Create() *Structs {
 	if f.t2 != nil {
 		return CreateModelStructs(f.t2.New())
 	}
@@ -261,9 +261,7 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 			return err
 		}
 		if str, ok := value.(string); ok {
-			if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
-				value = str[1 : len(str)-1]
-			}
+			str = trimConsts(str)
 		}
 		if value != nil {
 			if err := s.SetFieldValue(field, value); err != nil {
@@ -412,9 +410,13 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 			v := DereferenceValue(reflect.ValueOf(f.Value()))
 			return v.Convert(reflect.TypeOf(float64(0))).Interface(), nil
 		}
-		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
+		v := DereferenceValue(reflect.ValueOf(f.Value())).Interface()
+		if str, ok := v.(string); ok {
+			return trimConsts(str), nil
+		}
+		return v, nil
 	}
-	return param, nil
+	return trimConsts(param), nil
 }
 
 // param可能是字段，也可能普通字符串. 如果非字段，则返回该param
@@ -528,7 +530,7 @@ func (s *Structs) buildAllParamQuery() []*fieldQryFormat {
 
 // BuildFormQuery ...生成有关model的全部param， 返回查询结构数组， 用于where 或者 join查询的ON
 // 但当param被附加声明format后，并不返回。此操作可能为sum count 等聚合操作， 后续中为having。
-func (s *Structs) buildFormQuery(tblname, model string) []*fieldQryFormat {
+func (s *Structs) buildFormQuery(model string) []*fieldQryFormat {
 	withModel := strcase.ToSnake(model)
 	query := []*fieldQryFormat{}
 	for _, field := range s.Fields() {
@@ -537,9 +539,11 @@ func (s *Structs) buildFormQuery(tblname, model string) []*fieldQryFormat {
 			bindField := strings.Split(GetSub(k, "param"), ".")[1]
 			if q := formatQryParam(field); q != nil {
 				fname := strcase.ToSnake(bindField)
-				q.operator = fmt.Sprintf("%s %s", fname, q.operator)
-				if len(tblname) > 0 {
-					q.operator = fmt.Sprintf("%s.%s", tblname, q.operator)
+				q.bindfield = fname
+				q.fname = field.Name()
+				q.model = model
+				if strings.Contains(k, "condition") {
+					q.withCondition = true
 				}
 				query = append(query, q)
 			}
@@ -647,7 +651,7 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 	}
 	if str, ok := singleValue.Interface().(string); ok {
 		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
-			return &fieldQryFormat{operator: fmt.Sprintf("%s %s", operator, str[1:len(str)-1])}
+			return &fieldQryFormat{operator: fmt.Sprintf("%s %s", operator, trimConsts(str))}
 		}
 	}
 	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}

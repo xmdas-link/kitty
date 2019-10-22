@@ -41,10 +41,6 @@ func (crud *crud) queryExpr() (interface{}, error) {
 		return nil, err
 	}
 
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
 	kittys := &kittys{
 		ctx:          c,
 		ModelStructs: s,
@@ -54,13 +50,15 @@ func (crud *crud) queryExpr() (interface{}, error) {
 		return nil, err
 	}
 
-	var qry qry
-	//	if len(kittys.kittys) > 1 {
-	qry = evalJoin(s, kittys, search, db)
-	//} else {
-	//	qry = evalSimpleQry(s, kittys, search, db)
-	//}
-	return qry.prepare().QueryExpr(), nil
+	params := make(map[string]interface{})
+	params["ms"] = s
+	params["kittys"] = kittys
+	if err := Getter(s, params, db, c); err != nil {
+		return nil, err
+	}
+	qry := evalJoin(s, kittys, search, db)
+
+	return qry.query().QueryExpr(), nil
 }
 
 func (crud *crud) queryObj() (interface{}, error) {
@@ -73,10 +71,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 	)
 
 	if err := vd.Validate(s.raw); err != nil {
-		return nil, err
-	}
-
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -99,13 +93,18 @@ func (crud *crud) queryObj() (interface{}, error) {
 	if err := kittys.parse(s); err != nil {
 		return nil, err
 	}
+	if len(kittys.kittys) == 0 {
+		return crud.common()
+	}
 
-	var qry qry
-	//if len(kittys.kittys) > 1 {
-	qry = evalJoin(s, kittys, search, db)
-	//	} else {
-	//	qry = evalSimpleQry(s, kittys, search, db)
-	//}
+	params := make(map[string]interface{})
+	params["ms"] = s
+	params["kittys"] = kittys
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+
+	qry := evalJoin(s, kittys, search, db)
 
 	var (
 		res interface{}
@@ -122,9 +121,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 		}
 	}
 
-	params := make(map[string]interface{})
-	params["ms"] = s
-	params["kittys"] = kittys
 	if err = Setter(s, params, db, c); err != nil {
 		return nil, err
 	}
@@ -156,15 +152,20 @@ func (crud *crud) createObj() (interface{}, error) {
 		return nil, err
 	}
 
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
 	kittys := &kittys{
 		ModelStructs: s,
 		db:           db,
 	}
 	if err := kittys.parse(s); err != nil {
+		return nil, err
+	}
+	if len(kittys.kittys) == 0 {
+		return crud.common()
+	}
+	params := make(map[string]interface{})
+	params["ms"] = s
+	params["kittys"] = kittys
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -199,9 +200,6 @@ func (crud *crud) createObj() (interface{}, error) {
 		}
 	}
 
-	params := make(map[string]interface{})
-	params["ms"] = s
-	params["kittys"] = kittys
 	if err = Setter(s, params, db, c); err != nil {
 		return nil, err
 	}
@@ -227,15 +225,20 @@ func (crud *crud) updateObj() (interface{}, error) {
 		return nil, err
 	}
 
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
 	kittys := &kittys{
 		ModelStructs: s,
 		db:           db,
 	}
 	if err := kittys.parse(s); err != nil {
+		return nil, err
+	}
+	if len(kittys.kittys) == 0 {
+		return crud.common()
+	}
+	params := make(map[string]interface{})
+	params["ms"] = s
+	params["kittys"] = kittys
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -259,9 +262,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 	if err := qry.update(); err != nil {
 		return nil, err
 	}
-	params := make(map[string]interface{})
-	params["ms"] = s
-	params["kittys"] = kittys
 	if err := Setter(s, params, db, c); err != nil {
 		return nil, err
 	}
@@ -275,7 +275,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 	return s.raw, nil
 }
 
-//
 func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c Context) (interface{}, error) {
 	crud := newcrud(&config{
 		strs:   s,
@@ -284,4 +283,33 @@ func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c Context) (inte
 		ctx:    c,
 	})
 	return crud.queryObj()
+}
+
+func (crud *crud) common() (interface{}, error) {
+	var (
+		s      = crud.strs
+		db     = crud.db
+		c      = crud.ctx
+		callbk = crud.callbk
+	)
+
+	if err := vd.Validate(s.raw); err != nil {
+		return nil, err
+	}
+
+	params := make(map[string]interface{})
+	if err := Getter(s, params, db, c); err != nil {
+		return nil, err
+	}
+	if err := Setter(s, params, db, c); err != nil {
+		return nil, err
+	}
+
+	if callbk != nil {
+		if err := callbk(s, db); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.raw, nil
 }

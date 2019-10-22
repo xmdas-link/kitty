@@ -8,7 +8,6 @@ import (
 	"github.com/Knetic/govaluate"
 	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/iancoleman/strcase"
-	"github.com/jinzhu/gorm"
 )
 
 // ToCamel 对id的特别处理。 PayID UserID 。
@@ -74,44 +73,6 @@ func GetSub(s string, sub string) string {
 	return ""
 }
 
-func pages(db *gorm.DB, search *SearchCondition, result interface{}, scan bool) (interface{}, error) {
-
-	tx := db
-	if search.Page != nil {
-		total := 0
-		if scan {
-			db.New().Raw("SELECT COUNT(*) FROM (?) tmp", tx.QueryExpr()).Count(&total)
-		} else {
-			tx = tx.Count(&total)
-		}
-		// 页数
-		pageInfo := MakePage(search.Page.Page, search.Page.Limit, uint32(total))
-		search.Page.Limit = pageInfo.Limit
-		search.Page.Page = pageInfo.Page
-		search.Page.Total = uint32(total)
-		search.Page.PageMax = pageInfo.PageMax
-
-		tx = tx.Offset(pageInfo.GetOffset()).Limit(pageInfo.Limit)
-	}
-
-	if scan {
-		tx = tx.Scan(result)
-	} else {
-		tx = tx.Find(result)
-	}
-
-	if tx.Error != nil {
-		return nil, tx.Error
-	}
-	if tx.RecordNotFound() {
-		return nil, nil
-	}
-
-	search.ReturnCount = int(tx.RowsAffected)
-
-	return result, nil
-}
-
 var (
 	exprFuncs map[string]govaluate.ExpressionFunction
 )
@@ -145,4 +106,11 @@ func trimSpace(s string) string {
 	s = strings.TrimPrefix(s, " ")
 	s = strings.TrimSuffix(s, " ")
 	return s
+}
+
+func trimConsts(str string) string {
+	if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
+		return str[1 : len(str)-1]
+	}
+	return str
 }

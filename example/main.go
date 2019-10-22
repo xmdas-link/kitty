@@ -87,6 +87,6 @@ func (*currentCtx) GetUID(ctx interface{}) (string, error) {
 	return "", errors.New("nothing")
 }
 
-func (*currentCtx) GetCtxInfo(ctx interface{}, s string) (string, error) {
-	return "", nil
+func (*currentCtx) GetCtxInfo(ctx interface{}, s string) (interface{}, error) {
+	return nil, nil
 }
