@@ -11,7 +11,7 @@ import (
 	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/fatih/structs"
 	"github.com/iancoleman/strcase"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/micro/go-micro/client"
 
 	"github.com/xmdas-link/kitty"
@@ -44,7 +44,9 @@ func (rpc *KittyClientRPC) Call(search *kitty.SearchCondition, action string, c 
 	}
 	rsp := &kittyrpc.Response{}
 
-	if rsp, err = rpc.CliService.Call(context.TODO(), &req); err == nil {
+	ctx, _ := c.GetCtxInfo("ContextRPC")
+
+	if rsp, err = rpc.CliService.Call(ctx.(context.Context), &req); err == nil {
 		if len(rsp.Msg) > 0 {
 			res := &kitty.CrudResult{}
 			err = json.Unmarshal([]byte(rsp.Msg), res)
