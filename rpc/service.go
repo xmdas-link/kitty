@@ -10,11 +10,32 @@ import (
 	kittyrpc "github.com/xmdas-link/kitty/rpc/proto/kittyrpc"
 )
 
+// SrvContext get something from context
+type SrvContext interface {
+	GetCtxInfo(context.Context, string) (interface{}, error)
+}
+
 //KittyRPCService ...
 type KittyRPCService struct {
 	DB     *gorm.DB
 	Callbk kitty.SuccessCallback
-	Ctx    kitty.Context
+	Ctx    SrvContext
+}
+
+type rpcContext struct {
+	ctx    context.Context
+	srvCtx SrvContext
+}
+
+func (c *rpcContext) CurrentUID() (string, error) {
+	s, err := c.srvCtx.GetCtxInfo(c.ctx, "loginid")
+	if err != nil {
+		return "", err
+	}
+	return s.(string), nil
+}
+func (c *rpcContext) GetCtxInfo(s string) (interface{}, error) {
+	return c.srvCtx.GetCtxInfo(c.ctx, s)
 }
 
 // Call rpc call handle
@@ -32,7 +53,7 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 		return err
 	}
 	if rpc.DB == nil {
-		obj, err := rpc.Ctx.GetCtxInfo(ctx)
+		obj, err := rpc.Ctx.GetCtxInfo(ctx, "ContextDB")
 		if err == nil {
 			rpc.DB = obj.(*gorm.DB)
 		} else {
@@ -47,7 +68,11 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 	}
 	fmt.Printf("rpc %s call\n", req.Model)
 
-	if res, err = crud.Do(&search, req.Action, rpc.Ctx); err == nil && res != nil {
+	rpcCtx := &rpcContext{
+		ctx:    ctx,
+		srvCtx: rpc.Ctx,
+	}
+	if res, err = crud.Do(&search, req.Action, rpcCtx); err == nil && res != nil {
 		if jsonbytes, err = json.Marshal(res); err == nil {
 			rsp.Msg = string(jsonbytes)
 			return nil
