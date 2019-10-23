@@ -560,14 +560,9 @@ func (s *Structs) buildFormQuery(model string) []*fieldQryFormat {
 	return query
 }
 
-type modelFieldAs struct {
-	model string   //model name
-	as    []string //
-}
-
-func (s *Structs) nameAs(names []*modelFieldAs) {
+func (s *Structs) nameAs(names map[string][]string) {
 	//	names := make()
-	var f1 = func(name string, typeKind FieldTypeAndKind, k string, names []*modelFieldAs) {
+	var f1 = func(typeKind FieldTypeAndKind, k string, names map[string][]string) {
 		if typeKind.KindOfField == reflect.Struct ||
 			typeKind.KindOfField == reflect.Slice && DereferenceType(typeKind.TypeOfField.Elem()).Kind() == reflect.Struct {
 			bindfields := GetSub(k, "bind")
@@ -575,10 +570,7 @@ func (s *Structs) nameAs(names []*modelFieldAs) {
 				bindfields = strings.Split(bindfields, ".")[1]
 
 				if v := strings.Split(bindfields, ","); bindfields != "*" && len(v) > 0 {
-					names = append(names, &modelFieldAs{
-						model: typeKind.ModelName,
-						as:    v,
-					})
+					names[typeKind.ModelName] = v
 				}
 			}
 		}
@@ -589,13 +581,13 @@ func (s *Structs) nameAs(names []*modelFieldAs) {
 			typeKind := TypeKind(field)
 			if strings.Contains(k, "bindresult") {
 				if strings.Contains(k, fmt.Sprintf("bind:%s", strcase.ToSnake(typeKind.ModelName))) {
-					f1(field.Name(), typeKind, k, names)
+					f1(typeKind, k, names)
 				} else {
 					ss := typeKind.Create()
 					ss.nameAs(names)
 				}
 			} else {
-				f1(field.Name(), typeKind, k, names)
+				f1(typeKind, k, names)
 			}
 		}
 	}

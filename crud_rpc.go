@@ -29,7 +29,7 @@ func (crud *RPCCrud) Do(search *SearchCondition, action string, c Context) (inte
 			Ref:  time.Now().UnixNano() / 1e6,
 			Data: res,
 		}
-		nameAs := []*modelFieldAs{}
+		nameAs := make(map[string][]string)
 		s := CreateModelStructs(res)
 		s.nameAs(nameAs)
 		return &Result{

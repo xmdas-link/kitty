@@ -25,9 +25,8 @@ func (encoder *omitEncoder) IsEmbeddedPtrNil(ptr unsafe.Pointer) bool {
 
 type filterFieldsExtension struct {
 	jsoniter.DummyExtension
-	//	Fields []string
-	//	Name   string //model name
-	As []*modelFieldAs
+	Fields []string
+	Name   string //model name
 }
 
 func (extension *filterFieldsExtension) UpdateStructDescriptor(structDescriptor *jsoniter.StructDescriptor) {
@@ -35,15 +34,15 @@ func (extension *filterFieldsExtension) UpdateStructDescriptor(structDescriptor 
 		binding.ToNames = []string{strcase.ToSnake(binding.Field.Name())}
 		binding.FromNames = []string{strcase.ToSnake(binding.Field.Name())}
 	}
-	if len(extension.As) > 0 {
+	if len(extension.Name) > 0 {
 		structType := structDescriptor.Type.(*reflect2.UnsafeStructType)
 		name := structType.Name()
-		if name != extension.As[0].model {
+		if name != extension.Name {
 			return
 		}
 	}
 
-	if len(extension.As[0].as) == 0 {
+	if len(extension.Fields) == 0 {
 		return
 	}
 
@@ -52,17 +51,12 @@ func (extension *filterFieldsExtension) UpdateStructDescriptor(structDescriptor 
 		binding.Encoder = &omitEncoder{ValEncoder: binding.Encoder}
 
 		name := strcase.ToSnake(binding.Field.Name())
-		for _, v := range extension.As[0].as {
+		for _, v := range extension.Fields {
 			if name == v {
 				binding.Encoder = defaultEncoder
 				break
 			}
 		}
-	}
-	if len(extension.As) > 1 {
-		extension.As = extension.As[1:]
-	} else if len(extension.As) == 1 {
-		extension.As = []*modelFieldAs{}
 	}
 }
 

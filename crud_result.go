@@ -14,7 +14,7 @@ type CrudResult struct {
 // Result 。
 type Result struct {
 	CrudResult
-	NameAs []*modelFieldAs `json:"-"`
+	NameAs map[string][]string `json:"-"`
 	Cfg    jsoniter.API
 }
 
@@ -25,8 +25,10 @@ func (c *Result) JsonAPI(j jsoniter.API) {
 
 // MarshalJSON ...
 func (c *Result) MarshalJSON() ([]byte, error) {
-	//c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, nil})
-	c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, c.NameAs})
+	c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, []string{}, ""})
+	for k, v := range c.NameAs {
+		c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, v, k})
+	}
 	jsoniter.RegisterTypeEncoder("time.Time", &timeAsString{})
 	return c.Cfg.Marshal(c.CrudResult)
 }

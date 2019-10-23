@@ -3,7 +3,6 @@ package kitty
 import (
 	"errors"
 	"fmt"
-	"log"
 	"runtime"
 	"time"
 
@@ -82,7 +81,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	}
 
 	if err == nil {
-		nameAs := []*modelFieldAs{}
+		nameAs := make(map[string][]string)
 		result := CrudResult{
 			Code: 1,
 			Ref:  time.Now().UnixNano() / 1e6,
@@ -100,10 +99,9 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			jsoniter.Config{}.Froze(),
 		}, nil
 	}
-	if mysqlErr, ok := err.(*mysql.MySQLError); ok {
-		log.Println(mysqlErr)
+	if _, ok := err.(*mysql.MySQLError); ok {
 		if kittyMode == debugCode {
-			return nil, fmt.Errorf("数据库错误: %s", mysqlErr)
+			return nil, err
 		}
 		return nil, errors.New("数据库执行错误")
 	}

@@ -28,10 +28,11 @@ type FormUpdateUser struct {
 // FormUser 用户信息/ 参数： ID/Name 两者其一
 // 通过修改bind:user.*返回所有字段
 type FormUser struct {
-	*User `kitty:"bind:user.id,created_at,name,age;bindresult;"`
-	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
-	Name  *string `json:"-" kitty:"param:user.name;"`
-	MUser User    `json:"-" kitty:"master"`
+	U1 []*User `kitty:"bind:user.id,created_at,name,age;getter:rds('')"`
+	U2 []*User `kitty:"bind:user.id,name,department;getter:rds('id>10')"`
+//	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
+//	Name  *string `json:"-" kitty:"param:user.name;"`
+//	MUser User    `json:"-" kitty:"master"`
 }
 
 // FormUserList 用户列表
