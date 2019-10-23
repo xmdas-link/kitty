@@ -1,7 +1,6 @@
 package kitty
 
 import (
-	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/jinzhu/gorm"
 )
 
@@ -36,12 +35,7 @@ func (crud *crud) queryExpr() (interface{}, error) {
 		db     = crud.db
 		c      = crud.ctx
 	)
-
-	if err := vd.Validate(s.raw); err != nil {
-		return nil, err
-	}
-	params := make(map[string]interface{})
-	if err := Getter(s, params, db, c); err != nil {
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -68,10 +62,17 @@ func (crud *crud) queryObj() (interface{}, error) {
 		callbk = crud.callbk
 	)
 
-	if err := vd.Validate(s.raw); err != nil {
+	kittys := &kittys{
+		ctx:          c,
+		ModelStructs: s,
+		db:           db,
+	}
+	if err := kittys.parse(s); err != nil {
 		return nil, err
 	}
-
+	if len(kittys.kittys) == 0 {
+		return crud.common()
+	}
 	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
@@ -85,18 +86,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 	}
 	if Page.Limit > 0 && Page.Page > 0 {
 		search.Page = Page
-	}
-
-	kittys := &kittys{
-		ctx:          c,
-		ModelStructs: s,
-		db:           db,
-	}
-	if err := kittys.parse(s); err != nil {
-		return nil, err
-	}
-	if len(kittys.kittys) == 0 {
-		return crud.common()
 	}
 
 	qry := evalJoin(s, kittys, search, db)
@@ -143,13 +132,6 @@ func (crud *crud) createObj() (interface{}, error) {
 		callbk = crud.callbk
 	)
 
-	if err := vd.Validate(s.raw); err != nil {
-		return nil, err
-	}
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
 	kittys := &kittys{
 		ModelStructs: s,
 		db:           db,
@@ -159,6 +141,9 @@ func (crud *crud) createObj() (interface{}, error) {
 	}
 	if len(kittys.kittys) == 0 {
 		return crud.common()
+	}
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
 	}
 
 	qry := &simpleQuery{
@@ -213,14 +198,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 		callbk = crud.callbk
 	)
 
-	if err := vd.Validate(s.raw); err != nil {
-		return nil, err
-	}
-
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
 	kittys := &kittys{
 		ModelStructs: s,
 		db:           db,
@@ -230,6 +207,10 @@ func (crud *crud) updateObj() (interface{}, error) {
 	}
 	if len(kittys.kittys) == 0 {
 		return crud.common()
+	}
+
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
 	}
 
 	qry := &simpleQuery{
@@ -282,10 +263,6 @@ func (crud *crud) common() (interface{}, error) {
 		c      = crud.ctx
 		callbk = crud.callbk
 	)
-
-	if err := vd.Validate(s.raw); err != nil {
-		return nil, err
-	}
 
 	params := make(map[string]interface{})
 	if err := Getter(s, params, db, c); err != nil {

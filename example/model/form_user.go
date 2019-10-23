@@ -30,9 +30,10 @@ type FormUpdateUser struct {
 type FormUser struct {
 	U1 []*User `kitty:"bind:user.id,created_at,name,age;getter:rds('')"`
 	U2 []*User `kitty:"bind:user.id,name,department;getter:rds('id>10')"`
-//	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
-//	Name  *string `json:"-" kitty:"param:user.name;"`
-//	MUser User    `json:"-" kitty:"master"`
+	U3 string  `kitty:"param:U2.name"`
+	//	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
+	//	Name  *string `json:"-" kitty:"param:user.name;"`
+	//	MUser User    `json:"-" kitty:"master"`
 }
 
 // FormUserList 用户列表

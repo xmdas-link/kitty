@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
 	jsoniter "github.com/json-iterator/go"
@@ -49,7 +50,9 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	if err := s.ParseFormValues(search.FormValues); err != nil {
 		return nil, err
 	}
-
+	if err := vd.Validate(s.raw); err != nil {
+		return nil, err
+	}
 	var (
 		res interface{}
 		err error
