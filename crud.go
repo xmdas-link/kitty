@@ -40,6 +40,10 @@ func (crud *crud) queryExpr() (interface{}, error) {
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
 	}
+	params := make(map[string]interface{})
+	if err := Getter(s, params, db, c); err != nil {
+		return nil, err
+	}
 
 	kittys := &kittys{
 		ctx:          c,
@@ -50,12 +54,6 @@ func (crud *crud) queryExpr() (interface{}, error) {
 		return nil, err
 	}
 
-	params := make(map[string]interface{})
-	params["ms"] = s
-	params["kittys"] = kittys
-	if err := Getter(s, params, db, c); err != nil {
-		return nil, err
-	}
 	qry := evalJoin(s, kittys, search, db)
 
 	return qry.query().QueryExpr(), nil
@@ -71,6 +69,10 @@ func (crud *crud) queryObj() (interface{}, error) {
 	)
 
 	if err := vd.Validate(s.raw); err != nil {
+		return nil, err
+	}
+
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -97,13 +99,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 		return crud.common()
 	}
 
-	params := make(map[string]interface{})
-	params["ms"] = s
-	params["kittys"] = kittys
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
 	qry := evalJoin(s, kittys, search, db)
 
 	var (
@@ -121,7 +116,7 @@ func (crud *crud) queryObj() (interface{}, error) {
 		}
 	}
 
-	if err = Setter(s, params, db, c); err != nil {
+	if err = Setter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
@@ -151,6 +146,9 @@ func (crud *crud) createObj() (interface{}, error) {
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
 	}
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
 
 	kittys := &kittys{
 		ModelStructs: s,
@@ -161,12 +159,6 @@ func (crud *crud) createObj() (interface{}, error) {
 	}
 	if len(kittys.kittys) == 0 {
 		return crud.common()
-	}
-	params := make(map[string]interface{})
-	params["ms"] = s
-	params["kittys"] = kittys
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
 	}
 
 	qry := &simpleQuery{
@@ -200,7 +192,7 @@ func (crud *crud) createObj() (interface{}, error) {
 		}
 	}
 
-	if err = Setter(s, params, db, c); err != nil {
+	if err = Setter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 	if callbk != nil {
@@ -225,6 +217,10 @@ func (crud *crud) updateObj() (interface{}, error) {
 		return nil, err
 	}
 
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+
 	kittys := &kittys{
 		ModelStructs: s,
 		db:           db,
@@ -234,12 +230,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 	}
 	if len(kittys.kittys) == 0 {
 		return crud.common()
-	}
-	params := make(map[string]interface{})
-	params["ms"] = s
-	params["kittys"] = kittys
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
 	}
 
 	qry := &simpleQuery{
@@ -262,7 +252,7 @@ func (crud *crud) updateObj() (interface{}, error) {
 	if err := qry.update(); err != nil {
 		return nil, err
 	}
-	if err := Setter(s, params, db, c); err != nil {
+	if err := Setter(s, make(map[string]interface{}), db, c); err != nil {
 		return nil, err
 	}
 
