@@ -92,6 +92,12 @@ func (q *simpleQuery) update() error {
 						continue
 					}
 				}
+
+				if err := q.Result.SetFieldValue(f, resvalue); err != nil {
+					return err
+				}
+				updateWithStrs = true
+				continue
 			}
 			if DereferenceType(reflect.TypeOf(resvalue)).Kind() == reflect.Struct {
 				if err := f.Set(resvalue); err != nil {
