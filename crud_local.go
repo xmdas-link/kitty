@@ -82,7 +82,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	}
 
 	if err == nil {
-		nameAs := make(map[string][]string)
+		nameAs := []*modelFieldAs{}
 		result := CrudResult{
 			Code: 1,
 			Ref:  time.Now().UnixNano() / 1e6,

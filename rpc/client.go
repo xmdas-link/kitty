@@ -24,6 +24,7 @@ var json = jsoniter.ConfigCompatibleWithStandardLibrary
 type KittyClientRPC struct {
 	CliService kittyrpc.KittyrpcService
 	Model      interface{}
+	modelname  string
 	Callbk     kitty.SuccessCallback
 }
 
@@ -36,9 +37,11 @@ func (rpc *KittyClientRPC) Call(search *kitty.SearchCondition, action string, c 
 	if err != nil {
 		return nil, err
 	}
-	model := kitty.CreateModelStructs(rpc.Model).Name()
+	if len(rpc.modelname) == 0 {
+		rpc.modelname = kitty.CreateModelStructs(rpc.Model).Name()
+	}
 	req := kittyrpc.Request{
-		Model:  model,
+		Model:  rpc.modelname,
 		Action: action,
 		Search: string(res),
 	}
@@ -89,7 +92,7 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 		}
 	}()
 
-	s := kitty.CreateModelStructs(rpc.Model)
+	s := kitty.CreateModelStructs(rpc.Model).New()
 	if err := s.ParseFormValues(search.FormValues); err != nil {
 		return nil, err
 	}
