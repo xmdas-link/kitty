@@ -57,6 +57,17 @@ type fieldQryFormat struct {
 	format        string // like format:sum($)
 }
 
+func (f *fieldQryFormat) nullExpr() string {
+	if len(f.value) == 1 {
+		if str, ok := f.value[0].(string); ok && str == "[NULL]" {
+			op := strings.ReplaceAll(f.operator, "(?)", "")
+			op = strings.ReplaceAll(op, "?", "")
+			return fmt.Sprintf("%s %s %s", f.bindfield, trimSpace(op), trimConsts(str))
+		}
+	}
+	return ""
+}
+
 func (f *fieldQryFormat) whereExpr() string {
 	return fmt.Sprintf("%s %s", f.bindfield, f.operator)
 }
@@ -268,9 +279,9 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 		if err != nil {
 			return err
 		}
-		if str, ok := value.(string); ok {
-			str = trimConsts(str)
-		}
+		//	if str, ok := value.(string); ok {
+		//		str = trimConsts(str)
+		//	}
 		if value != nil {
 			if err := s.SetFieldValue(field, value); err != nil {
 				return err
@@ -424,7 +435,7 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 		}
 		return v, nil
 	}
-	return trimConsts(param), nil
+	return param, nil
 }
 
 // param可能是字段，也可能普通字符串. 如果非字段，则返回该param
@@ -657,11 +668,11 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 		singleValue = reflect.ValueOf(field.Value()).Elem()
 		return &fieldQryFormat{operator: fmt.Sprintf("%s (?)", operator), value: []interface{}{singleValue.Interface()}}
 	}
-	if str, ok := singleValue.Interface().(string); ok {
-		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
-			return &fieldQryFormat{operator: fmt.Sprintf("%s %s", operator, trimConsts(str))}
-		}
-	}
+	//	if str, ok := singleValue.Interface().(string); ok {
+	//		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
+	//			return &fieldQryFormat{operator: fmt.Sprintf("%s %s", operator, trimConsts(str))}
+	//		}
+	//	}
 	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}
 }
 

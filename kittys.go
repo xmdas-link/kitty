@@ -190,8 +190,9 @@ func (ks *kittys) where() []*fieldQryFormat {
 	for _, v := range ks.qryFormats {
 		if masterModel == v.model && len(v.format) == 0 && !v.order { // 带有format 约束的，放入having
 			s = append(s, &fieldQryFormat{
-				operator: fmt.Sprintf("%s.%s %s", tblname, v.bindfield, v.operator),
-				value:    v.value,
+				bindfield: fmt.Sprintf("%s.%s", tblname, v.bindfield),
+				operator:  v.operator,
+				value:     v.value,
 			})
 		}
 	}
@@ -202,8 +203,9 @@ func (ks *kittys) where() []*fieldQryFormat {
 				fname := strcase.ToSnake(bind.FieldName)
 				if fname == v.fname {
 					s = append(s, &fieldQryFormat{
-						operator: fmt.Sprintf("%s %s", bind.funcName(), v.operator),
-						value:    v.value,
+						bindfield: bind.funcName(),
+						operator:  v.operator,
+						value:     v.value,
 					})
 				}
 			}

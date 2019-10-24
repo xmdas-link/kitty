@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/fatih/structs"
 	"github.com/iancoleman/strcase"
@@ -153,7 +154,14 @@ func (e *expr) init() {
 			dst:       e.f,
 			fieldStrs: e.s,
 		}
-		return list.getValue(strfield)
+		v, err := list.getValue(strfield)
+		if err != nil {
+			return nil, err
+		}
+		if str, ok := v.(string); ok {
+			return trimConsts(str), nil
+		}
+		return v, nil
 	}
 	functions["set"] = func(args ...interface{}) (interface{}, error) {
 		return args[0], nil
@@ -227,7 +235,7 @@ func (e *expr) init() {
 		queryformat := []*fieldQryFormat{}
 		vWhere := strings.Split(whereCondition, ",")
 		for _, expression := range vWhere {
-			operators := []string{" LIKE ", "<>", ">=", "<=", ">", "<", "="}
+			operators := []string{" LIKE ", " IS NOT ", " IS ", "<>", ">=", "<=", ">", "<", "="}
 			for _, oper := range operators {
 				if strings.Contains(expression, oper) {
 					vv := strings.Split(expression, oper)
@@ -293,58 +301,86 @@ func (e *expr) init() {
 		modelDeclared := false
 		fieldSel := ""
 		modelAs := ""
+		raw := ""
+		var ss *Structs
 
-		if len(args) == 2 {
-			fieldSel = args[1].(string)
-			if strings.Contains(fieldSel, ".") {
-				v := strings.Split(fieldSel, ".")
-				model = v[0]
-				fieldSel = v[1]
-				modelDeclared = true
-				if v = strings.Split(model, ","); len(v) == 2 {
+		if len(args) >= 1 {
+			raw = trimSpace(args[0].(string))
+			a1 := strings.Index(raw, "SELECT") // select * from users where id=1
+			b1 := strings.LastIndex(raw, "FROM")
+			if a1 > -1 && b1 > a1 {
+				if len(args) >= 2 {
+					model = args[1].(string)
+					if len(model) > 0 {
+						modelDeclared = true
+						ss = e.createM(args[1].(string))
+					} else {
+						ss = tk.Create()
+					}
+				} else {
+					ss = tk.Create()
+				}
+				tx = tx.Raw(raw)
+			} else {
+				raw = ""
+			}
+		}
+
+		if len(args) == 3 {
+			tx = tx.Order(args[2].(string))
+		}
+
+		if len(raw) == 0 { // 参数查询 product_id = product.id
+			if len(args) >= 2 {
+				fieldSel = args[1].(string)
+				if strings.Contains(fieldSel, ".") {
+					v := strings.Split(fieldSel, ".")
 					model = v[0]
-					modelAs = v[1]
+					fieldSel = v[1]
+					modelDeclared = true
+					if v = strings.Split(model, ","); len(v) == 2 {
+						model = v[0]
+						modelAs = v[1]
+					}
 				}
 			}
-			if len(fieldSel) > 0 {
-				tx = tx.Select(fieldSel)
-			}
-		}
 
-		var ss *Structs
-		if modelDeclared {
-			ss = e.createM(model)
-			if len(modelAs) > 0 {
-				tblname := tx.NewScope(ss.raw).TableName()
-				tx = tx.Table(fmt.Sprintf("%s %s", tblname, modelAs))
+			if modelDeclared {
+				ss = e.createM(model)
+				if len(modelAs) > 0 {
+					tblname := tx.NewScope(ss.raw).TableName()
+					tx = tx.Table(fmt.Sprintf("%s %s", tblname, modelAs))
+				} else {
+					tx = tx.Model(ss.raw)
+				}
 			} else {
-				tx = tx.Model(ss.raw)
+				ss = tk.Create()
 			}
-		} else {
-			ss = tk.Create()
-		}
 
-		var fieldAs = func(field string) string {
-			if len(modelAs) > 0 {
-				return fmt.Sprintf("%s.%s", modelAs, field)
-			}
-			return field
-		}
-
-		if len(args) > 0 { // 参数查询 product_id = product.id
 			argv := args[0].(string)
 			if len(argv) > 0 {
+				var fieldAs = func(field string) string {
+					if len(modelAs) > 0 {
+						return fmt.Sprintf("%s.%s", modelAs, field)
+					}
+					return field
+				}
 				if v := strings.Split(argv, ","); len(v) > 0 {
 					for _, expression := range v {
-						operators := []string{" LIKE ", "<>", ">=", "<=", ">", "<", "=", " IN "}
+						operators := []string{" LIKE ", " IS NOT ", " IS ", "<>", ">=", "<=", ">", "<", "=", " IN "}
 
 						for _, oper := range operators {
 							if strings.Contains(expression, oper) {
 								vv := strings.Split(expression, oper)
 								fname := strcase.ToSnake(trimSpace(vv[0]))
 								param := trimSpace(vv[1])
-								if len(param) > 2 && param[0] == '[' && param[len(param)-1] == ']' {
-									tx = tx.Where(fmt.Sprintf("%s %s %s", fieldAs(fname), oper, param[1:len(param)-1]))
+								if len(param) >= 2 && param[0] == '[' && param[len(param)-1] == ']' {
+									str := param[1 : len(param)-1]
+									if len(str) == 0 {
+										str = "''"
+									}
+									tx = tx.Where(fmt.Sprintf("%s %s %s", fieldAs(fname), oper, str))
+
 								} else {
 									res, err := e.s.getValue(param)
 									if err != nil {
@@ -360,12 +396,62 @@ func (e *expr) init() {
 			}
 		}
 
+		// pages
+		if pages, ok := e.s.FieldOk("Pages"); ok { // Pages kitty.Page `kitty:"page:List"`
+			if k := pages.Tag("kitty"); strings.Contains(k, "page:") {
+				if pageField := GetSub(k, "page"); pageField == e.f.Name() {
+					pageInfo := &Page{}
+					if f, ok := e.s.FieldOk("Page"); ok {
+						pageInfo.Page = f.Value().(uint32)
+					}
+					if f, ok := e.s.FieldOk("Limit"); ok {
+						pageInfo.Limit = f.Value().(uint32)
+					}
+
+					var txPages *gorm.DB
+					if len(raw) > 0 {
+						//a1 := strings.Index(raw, "SELECT") // select * from users where id=1
+						b1 := strings.LastIndex(raw, "FROM")
+						hasGroupBy := strings.Contains(raw, "GROUP BY")
+						if !hasGroupBy {
+							hasGroupBy = strings.Contains(raw, "HAVING")
+						}
+						hasJoin := strings.Contains(raw, " JOIN ")
+						if hasGroupBy || hasJoin {
+							txPages = e.db.Raw(fmt.Sprintf("SELECT COUNT(*) FROM (%s) tmp", raw))
+						} else {
+							txPages = e.db.Raw(fmt.Sprintf("SELECT COUNT(*) %s", raw[b1:]))
+						}
+
+					} else {
+						txPages = tx.Select("COUNT(*)")
+						if !modelDeclared {
+							txPages = txPages.Model(ss.raw)
+						}
+					}
+
+					total := 0
+					if err := txPages.Count(&total).Error; err != nil {
+						return nil, err
+					}
+					pageInfo.CountPages(uint32(total))
+					pages.Set(pageInfo)
+
+					tx = tx.Offset(pageInfo.GetOffset()).Limit(pageInfo.Limit)
+				}
+			}
+		}
+
+		if len(fieldSel) > 0 {
+			tx = tx.Select(fieldSel)
+		}
+
 		var err error
 		var res interface{}
 
 		switch tk.TypeOfField.Kind() {
 		case reflect.Struct:
-			if len(args) == 2 && modelDeclared {
+			if modelDeclared {
 				result := tk.Create()
 				err = tx.Scan(result.raw).Error
 				res = result.raw
@@ -377,7 +463,7 @@ func (e *expr) init() {
 				return nil, nil
 			}
 		case reflect.Slice: // like []UserResult []string
-			if len(args) == 2 && modelDeclared {
+			if modelDeclared {
 				rt := DereferenceType(tk.TypeOfField.Elem())
 				if rt.Kind() == reflect.Struct {
 					result := tk.Create()
@@ -586,6 +672,71 @@ func (e *expr) init() {
 	functions["rd_update_if"] = func(args ...interface{}) (interface{}, error) {
 		return If("rd_update", args...)
 	}
+	functions["now"] = func(args ...interface{}) (interface{}, error) {
+		tk := TypeKind(e.f)
+		if tk.KindOfField >= reflect.Int && tk.KindOfField <= reflect.Float64 {
+			return time.Now().UnixNano() / 1e6, nil
+		}
+		if tk.KindOfField == reflect.String {
+			format := "2006-01-02 15:04:05"
+			if len(args) == 1 {
+				format = args[0].(string)
+			}
+			return time.Now().Format(format), nil
+		}
+		switch e.f.Value().(type) {
+		case time.Time:
+			return time.Now(), nil
+		case *time.Time:
+			t := time.Now()
+			return &t, nil
+		}
+		return nil, fmt.Errorf("time now not support %s", e.f.Name())
+	}
+
+	/*
+		functions["page"] = func(args ...interface{}) (interface{}, error) {
+			exp := trimSpace(args[0].(string)) // rds('','')
+			a := strings.LastIndex(exp, ")")
+			c := strings.Count(exp, ",")
+			if c == 0 {
+				exp = exp[:a] + ",'','count(*)')" // rds('','','count(*)')
+			} else if c == 1 {
+				exp = exp[:a] + ",'count(*)')" // rds('','','count(*)')
+			}
+
+			type result struct {
+				Count uint32
+			}
+			res := &result{}
+			ss := CreateModelStructs(res)
+			f := ss.Field("Count")
+
+			eeee := &expr{
+				db:        e.db,
+				s:         ss,
+				f:         f,
+				functions: make(map[string]govaluate.ExpressionFunction),
+				params:    make(map[string]interface{}),
+				createM:   e.s.createModel,
+			}
+			eeee.init()
+
+			if err := eeee.eval(exp); err != nil {
+				return nil, err
+			}
+			Page := &Page{}
+			if f, ok := e.s.FieldOk("Page"); ok {
+				Page.Page = f.Value().(uint32)
+			}
+			if f, ok := e.s.FieldOk("Limit"); ok {
+				Page.Limit = f.Value().(uint32)
+			}
+			Page.CountPages(res.Count)
+
+			return Page, nil
+		}
+	*/
 }
 
 func setParam(f *structs.Field, name string, params map[string]interface{}) {
@@ -625,7 +776,7 @@ func hasLetter(str string) bool {
 }
 
 func sectionFunc(s *Structs, curf *structs.Field, sectionExp string, params map[string]interface{}) (string, error) {
-	keys := []string{"create_if", "update_if", "set_if", "vf", "rd_create_if", "rd_update_if"}
+	keys := []string{"create_if", "update_if", "set_if", "vf", "rd_create_if", "rd_update_if", "qry_if"}
 	for _, k := range keys {
 		if strings.HasPrefix(sectionExp, k) {
 			//create_if(result==1 && name==hello;'user_id=id,user_name=name')
@@ -676,6 +827,9 @@ func sectionFunc(s *Structs, curf *structs.Field, sectionExp string, params map[
 						v, err := s.getValue(thisField)
 						if err != nil {
 							return sectionExp, err
+						}
+						if s1, ok := v.(string); ok {
+							v = trimConsts(s1) // [billgates]
 						}
 						str := strings.ReplaceAll(fieldName, ".", "_")
 						str = strings.ReplaceAll(str, "[", "_")

@@ -64,7 +64,7 @@ func (q *simpleQuery) update() error {
 	tx := q.db.Model(q.Result.raw)
 
 	updates := make(map[string]interface{})
-	updateWithStrs := false
+	//updateWithStrs := false
 
 	qryformats := q.qryParams
 	qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
@@ -72,10 +72,18 @@ func (q *simpleQuery) update() error {
 	for _, qry := range qryformats {
 		if qry.withCondition || ToCamel(qry.bindfield) == "ID" {
 			whereCount++
-			w := qry.whereExpr()
-			tx = tx.Where(w, qry.value...)
+			if str := qry.nullExpr(); len(str) > 0 {
+				tx = tx.Where(str)
+			} else {
+				w := qry.whereExpr()
+				tx = tx.Where(w, qry.value...)
+			}
 		} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
 			resvalue := qry.value[0]
+			if str := qry.nullExpr(); len(str) > 0 {
+				updates[qry.bindfield] = nil
+				continue
+			}
 			switch f.Value().(type) {
 			case *time.Time:
 				if v, ok := resvalue.(string); ok {
@@ -96,17 +104,19 @@ func (q *simpleQuery) update() error {
 				if err := q.Result.SetFieldValue(f, resvalue); err != nil {
 					return err
 				}
-				updateWithStrs = true
-				continue
+				resvalue = DereferenceValue(reflect.ValueOf(f.Value()))
 			}
-			if DereferenceType(reflect.TypeOf(resvalue)).Kind() == reflect.Struct {
-				if err := f.Set(resvalue); err != nil {
-					return err
+			updates[qry.bindfield] = resvalue
+			/*
+				if DereferenceType(reflect.TypeOf(resvalue)).Kind() == reflect.Struct {
+					if err := f.Set(resvalue); err != nil {
+						return err
+					}
+					updateWithStrs = true
+				} else {
+					updates[qry.bindfield] = resvalue
 				}
-				updateWithStrs = true
-			} else {
-				updates[qry.bindfield] = resvalue
-			}
+			*/
 		} else {
 			return fmt.Errorf("%s field error %s", modelName, qry.bindfield)
 		}
@@ -115,10 +125,12 @@ func (q *simpleQuery) update() error {
 	if whereCount == 0 {
 		return fmt.Errorf("unable update %s, missing query condition", modelName)
 	}
-	if updateWithStrs {
-		tx = tx.Updates(q.Result.raw)
-		q.search.ReturnCount = int(tx.RowsAffected)
-	}
+	/*
+		if updateWithStrs {
+			tx = tx.Updates(q.Result.raw)
+			q.search.ReturnCount = int(tx.RowsAffected)
+		}
+	*/
 	if len(updates) > 0 {
 		tx = tx.Updates(updates)
 		q.search.ReturnCount = int(tx.RowsAffected)

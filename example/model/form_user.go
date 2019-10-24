@@ -1,6 +1,10 @@
 package model
 
-import "github.com/xmdas-link/kitty"
+import (
+	"time"
+
+	"github.com/xmdas-link/kitty"
+)
 
 // FormCreateUser 创建User，表单参数定义Name Age Department
 // 参数校验： 1. 名称不能为空  2. 名称不能重复 (通过定义字段User)
@@ -28,9 +32,12 @@ type FormUpdateUser struct {
 // FormUser 用户信息/ 参数： ID/Name 两者其一
 // 通过修改bind:user.*返回所有字段
 type FormUser struct {
-	U1 []*User `kitty:"bind:user.id,created_at,name,age;getter:rds('')"`
-	U2 []*User `kitty:"bind:user.id,name,department;getter:rds('id>10')"`
-	U3 string  `kitty:"param:U2.name"`
+
+	Page  uint32      `json:"-" kitty:"param;getter:set(1)" `
+	Limit uint32      `json:"-" kitty:"param;getter:set(1)" `
+	Pages *kitty.Page `kitty:"page:U2"`
+	U1 []*User `kitty:"bind:user.id,created_at,name,age;getter:rds('name<>[],age>[10]')"`
+	U2 []*User `kitty:"bind:user.id,name,department;getter:rds('SELECT * FROM users where id > 10','','id desc')"`
 	//	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
 	//	Name  *string `json:"-" kitty:"param:user.name;"`
 	//	MUser User    `json:"-" kitty:"master"`
@@ -42,12 +49,22 @@ type FormUser struct {
 type FormUserList struct {
 	List       []*User  `kitty:"bind:user.*;bindresult;"`
 	Name       []string `json:"-" kitty:"param:user.name;"`
-	CreateTime *string  `json:"-" kitty:"param:user.created_at;"`
-	Department *string  `json:"-" kitty:"param:user.department;"`
+	CreateTime *string  `json:"-" kitty:"param:user.created_at;getter:set('[NULL]');operator:IS NOT"`
+	Department string   `json:"-" kitty:"param:user.department;operator:<>"`
+
+	TimeAsString string     `kitty:"getter:now()"`
+	TimeFormat   string     `kitty:"getter:now(s.TimeFormats())"`
+	TimeAsInt    int64      `kitty:"getter:now()"`
+	Time         time.Time  `kitty:"getter:now()"`
+	TimePtr      *time.Time `kitty:"getter:now()"`
 
 	Page  uint32 `json:"-" kitty:"param" vd:"$>0&&$<100;msg:'input page'"`
 	Limit uint32 `json:"-" kitty:"param" vd:"$>0&&$<100;msg:'input limit'"`
 	Pages *kitty.Page
 
 	User User `json:"-" kitty:"master"`
+}
+
+func (*FormUserList) TimeFormats() (interface{}, error) {
+	return "2006-01-02 15:04:05", nil
 }

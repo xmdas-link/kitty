@@ -109,7 +109,7 @@ func trimSpace(s string) string {
 }
 
 func trimConsts(str string) string {
-	if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
+	if len(str) >= 2 && str[0] == '[' && str[len(str)-1] == ']' {
 		return str[1 : len(str)-1]
 	}
 	return str
