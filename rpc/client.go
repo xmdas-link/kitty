@@ -190,40 +190,41 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 					}
 				}
 			}
-			if isKittyRequest {
-				// format search condition.
-				form := make(map[string][]string)
-				for _, f := range paramStrs.Fields() {
-					if k := f.Tag("kitty"); len(k) > 0 && strings.Contains(k, "param:") && !strings.Contains(k, "-;param") {
-						x := ""
-						rv := kitty.DereferenceValue(reflect.ValueOf(f.Value()))
-						if rv.Kind() >= reflect.Bool && rv.Kind() <= reflect.Float64 {
-							x = fmt.Sprintf("%v", rv)
-						} else if rv.Kind() == reflect.String {
-							x = rv.Interface().(string)
-						}
-						if len(x) == 0 {
-							continue
-						}
-						name := strcase.ToSnake(f.Name())
-						if v := form[name]; v == nil {
-							form[name] = []string{}
-						}
-						v := form[name]
-						v = append(v, x)
-						form[name] = v
-					}
-				}
-				search := &kitty.SearchCondition{
-					FormValues: form,
-				}
-				res, err := json.Marshal(search)
-				if err != nil {
-					return nil, err
-				}
-				rpc.param.Field("Search").Set(string(res))
-			}
 		}
+		if isKittyRequest {
+			// format search condition.
+			form := make(map[string][]string)
+			for _, f := range paramStrs.Fields() {
+				if k := f.Tag("kitty"); len(k) > 0 && strings.Contains(k, "param") && !strings.Contains(k, "-;param") {
+					x := ""
+					rv := kitty.DereferenceValue(reflect.ValueOf(f.Value()))
+					if rv.Kind() >= reflect.Bool && rv.Kind() <= reflect.Float64 {
+						x = fmt.Sprintf("%v", rv)
+					} else if rv.Kind() == reflect.String {
+						x = rv.Interface().(string)
+					}
+					if len(x) == 0 {
+						continue
+					}
+					name := strcase.ToSnake(f.Name())
+					if v := form[name]; v == nil {
+						form[name] = []string{}
+					}
+					v := form[name]
+					v = append(v, x)
+					form[name] = v
+				}
+			}
+			search := &kitty.SearchCondition{
+				FormValues: form,
+			}
+			res, err := json.Marshal(search)
+			if err != nil {
+				return nil, err
+			}
+			rpc.param.Field("Search").Set(string(res))
+		}
+
 		var a = func(options *client.CallOptions) {
 		}
 		values := rpc.client.CallMethod(rpc.method, reflect.ValueOf(ctx), reflect.ValueOf(rpc.param.Raw()), reflect.ValueOf(a))
