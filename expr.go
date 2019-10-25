@@ -141,6 +141,8 @@ func (e *expr) init() {
 	functions["current"] = func(args ...interface{}) (interface{}, error) {
 		s := args[0].(string)
 		switch s {
+		case "db":
+			return e.db, nil
 		case "loginid":
 			return e.ctx.CurrentUID()
 		default:
@@ -235,7 +237,7 @@ func (e *expr) init() {
 		queryformat := []*fieldQryFormat{}
 		vWhere := strings.Split(whereCondition, ",")
 		for _, expression := range vWhere {
-			operators := []string{" LIKE ", " IS NOT ", " IS ", "<>", ">=", "<=", ">", "<", "="}
+			operators := []string{" LIKE ", " IS NOT ", " IS ", " NOT IN ", " IN ", "<>", ">=", "<=", ">", "<", "="}
 			for _, oper := range operators {
 				if strings.Contains(expression, oper) {
 					vv := strings.Split(expression, oper)
@@ -305,24 +307,26 @@ func (e *expr) init() {
 		var ss *Structs
 
 		if len(args) >= 1 {
-			raw = trimSpace(args[0].(string))
-			a1 := strings.Index(raw, "SELECT") // select * from users where id=1
-			b1 := strings.LastIndex(raw, "FROM")
-			if a1 > -1 && b1 > a1 {
+			if gormExpr, ok := args[0].(*interface{}); ok {
+				raw = "raw"
 				if len(args) >= 2 {
 					model = args[1].(string)
 					if len(model) > 0 {
 						modelDeclared = true
 						ss = e.createM(args[1].(string))
-					} else {
-						ss = tk.Create()
 					}
-				} else {
+				}
+				if !modelDeclared {
+					k := tk.TypeOfField
+					if k.Kind() == reflect.Slice {
+						k = DereferenceType(k.Elem())
+					}
+					if k.Kind() != reflect.Struct {
+						return nil, fmt.Errorf("%s must a struct, or specify a model in the second param", e.f.Name())
+					}
 					ss = tk.Create()
 				}
-				tx = tx.Raw(raw)
-			} else {
-				raw = ""
+				tx = tx.Raw("?", *gormExpr)
 			}
 		}
 
@@ -357,17 +361,17 @@ func (e *expr) init() {
 				ss = tk.Create()
 			}
 
-			argv := args[0].(string)
-			if len(argv) > 0 {
-				var fieldAs = func(field string) string {
-					if len(modelAs) > 0 {
-						return fmt.Sprintf("%s.%s", modelAs, field)
-					}
-					return field
-				}
+			if len(args) > 0 {
+				argv := args[0].(string)
 				if v := strings.Split(argv, ","); len(v) > 0 {
+					var fieldAs = func(field string) string {
+						if len(modelAs) > 0 {
+							return fmt.Sprintf("%s.%s", modelAs, field)
+						}
+						return field
+					}
 					for _, expression := range v {
-						operators := []string{" LIKE ", " IS NOT ", " IS ", "<>", ">=", "<=", ">", "<", "=", " IN "}
+						operators := []string{" LIKE ", " IS NOT ", " IS ", "<>", ">=", "<=", ">", "<", "=", " NOT IN ", " IN "}
 
 						for _, oper := range operators {
 							if strings.Contains(expression, oper) {
@@ -398,8 +402,11 @@ func (e *expr) init() {
 
 		// pages
 		if pages, ok := e.s.FieldOk("Pages"); ok { // Pages kitty.Page `kitty:"page:List"`
-			if k := pages.Tag("kitty"); strings.Contains(k, "page:") {
-				if pageField := GetSub(k, "page"); pageField == e.f.Name() {
+			if k := pages.Tag("kitty"); strings.Contains(k, fmt.Sprintf("page:%s", e.f.Name())) {
+				if !pages.IsZero() {
+					pageInfo := pages.Value().(*Page)
+					tx = tx.Offset(pageInfo.GetOffset()).Limit(pageInfo.Limit)
+				} else {
 					pageInfo := &Page{}
 					if f, ok := e.s.FieldOk("Page"); ok {
 						pageInfo.Page = f.Value().(uint32)
@@ -410,19 +417,8 @@ func (e *expr) init() {
 
 					var txPages *gorm.DB
 					if len(raw) > 0 {
-						//a1 := strings.Index(raw, "SELECT") // select * from users where id=1
-						b1 := strings.LastIndex(raw, "FROM")
-						hasGroupBy := strings.Contains(raw, "GROUP BY")
-						if !hasGroupBy {
-							hasGroupBy = strings.Contains(raw, "HAVING")
-						}
-						hasJoin := strings.Contains(raw, " JOIN ")
-						if hasGroupBy || hasJoin {
-							txPages = e.db.Raw(fmt.Sprintf("SELECT COUNT(*) FROM (%s) tmp", raw))
-						} else {
-							txPages = e.db.Raw(fmt.Sprintf("SELECT COUNT(*) %s", raw[b1:]))
-						}
-
+						gormExpr := args[0].(*interface{})
+						txPages = e.db.Raw(fmt.Sprintf("SELECT COUNT(*) FROM (%s) tmp", *gormExpr))
 					} else {
 						txPages = tx.Select("COUNT(*)")
 						if !modelDeclared {
@@ -440,10 +436,16 @@ func (e *expr) init() {
 					tx = tx.Offset(pageInfo.GetOffset()).Limit(pageInfo.Limit)
 				}
 			}
+
 		}
 
 		if len(fieldSel) > 0 {
-			tx = tx.Select(fieldSel)
+			if !strings.Contains(fieldSel, ",") {
+				tx = tx.Select(fmt.Sprintf("%s AS %s", fieldSel, strcase.ToSnake(e.f.Name())))
+				fieldSel = strcase.ToSnake(e.f.Name())
+			} else {
+				tx = tx.Select(fieldSel)
+			}
 		}
 
 		var err error
@@ -694,49 +696,30 @@ func (e *expr) init() {
 		return nil, fmt.Errorf("time now not support %s", e.f.Name())
 	}
 
-	/*
-		functions["page"] = func(args ...interface{}) (interface{}, error) {
-			exp := trimSpace(args[0].(string)) // rds('','')
-			a := strings.LastIndex(exp, ")")
-			c := strings.Count(exp, ",")
-			if c == 0 {
-				exp = exp[:a] + ",'','count(*)')" // rds('','','count(*)')
-			} else if c == 1 {
-				exp = exp[:a] + ",'count(*)')" // rds('','','count(*)')
-			}
+	functions["page"] = func(args ...interface{}) (interface{}, error) {
+		// page(gorm.expr) // select count(*)
+		Page := &Page{}
+		var gormExpr interface{}
 
-			type result struct {
-				Count uint32
-			}
-			res := &result{}
-			ss := CreateModelStructs(res)
-			f := ss.Field("Count")
-
-			eeee := &expr{
-				db:        e.db,
-				s:         ss,
-				f:         f,
-				functions: make(map[string]govaluate.ExpressionFunction),
-				params:    make(map[string]interface{}),
-				createM:   e.s.createModel,
-			}
-			eeee.init()
-
-			if err := eeee.eval(exp); err != nil {
-				return nil, err
-			}
-			Page := &Page{}
-			if f, ok := e.s.FieldOk("Page"); ok {
-				Page.Page = f.Value().(uint32)
-			}
-			if f, ok := e.s.FieldOk("Limit"); ok {
-				Page.Limit = f.Value().(uint32)
-			}
-			Page.CountPages(res.Count)
-
-			return Page, nil
+		if e, ok := args[0].(*interface{}); ok {
+			gormExpr = *e
+		} else if e, ok := args[0].(interface{}); ok {
+			gormExpr = e
+		} else {
+			return nil, errors.New("page: param error")
 		}
-	*/
+
+		e.db.Raw("?", gormExpr).Count(&Page.Total)
+		if f, ok := e.s.FieldOk("Page"); ok {
+			Page.Page = f.Value().(uint32)
+		}
+		if f, ok := e.s.FieldOk("Limit"); ok {
+			Page.Limit = f.Value().(uint32)
+		}
+		Page.CountPages(Page.Total)
+		return Page, nil
+	}
+
 }
 
 func setParam(f *structs.Field, name string, params map[string]interface{}) {

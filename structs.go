@@ -155,6 +155,23 @@ func (s *Structs) CallMethod(name string, values ...reflect.Value) []reflect.Val
 
 // SetFieldValue ...
 func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
+
+	var sameKind = func() bool {
+		if reflect.ValueOf(value).Kind() != f.Kind() {
+			return false
+		}
+		if f.Kind() == reflect.Ptr || f.Kind() == reflect.Slice {
+			v1 := DereferenceValue(reflect.ValueOf(value)).Kind()
+			if v1 != TypeKind(f).KindOfField {
+				return false
+			}
+		}
+		return true
+	}
+	if sameKind() {
+		return f.Set(value)
+	}
+
 	rv := DereferenceValue(reflect.ValueOf(value))
 	VK := rv.Kind()
 
@@ -312,7 +329,10 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 			sliceIdx = fieldName[i+1 : b]
 			fieldName = fieldName[:i]
 		}
-		field := list.fieldStrs.Field(ToCamel(fieldName))
+		field, ok := list.fieldStrs.FieldOk(ToCamel(fieldName))
+		if !ok {
+			return nil, fmt.Errorf("field %s not exist", fieldName)
+		}
 		if field.IsZero() {
 			return nil, nil
 		}
@@ -429,11 +449,7 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 			v := DereferenceValue(reflect.ValueOf(f.Value()))
 			return v.Convert(reflect.TypeOf(float64(0))).Interface(), nil
 		}
-		v := DereferenceValue(reflect.ValueOf(f.Value())).Interface()
-		if str, ok := v.(string); ok {
-			return trimConsts(str), nil
-		}
-		return v, nil
+		return DereferenceValue(reflect.ValueOf(f.Value())).Interface(), nil
 	}
 	return param, nil
 }

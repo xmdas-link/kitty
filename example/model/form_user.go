@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/xmdas-link/kitty"
 )
 
@@ -32,15 +33,26 @@ type FormUpdateUser struct {
 // FormUser 用户信息/ 参数： ID/Name 两者其一
 // 通过修改bind:user.*返回所有字段
 type FormUser struct {
-
 	Page  uint32      `json:"-" kitty:"param;getter:set(1)" `
 	Limit uint32      `json:"-" kitty:"param;getter:set(1)" `
-	Pages *kitty.Page `kitty:"page:U2"`
-	U1 []*User `kitty:"bind:user.id,created_at,name,age;getter:rds('name<>[],age>[10]')"`
-	U2 []*User `kitty:"bind:user.id,name,department;getter:rds('SELECT * FROM users where id > 10','','id desc')"`
+	Pages *kitty.Page `kitty:"page:List;getter:page(s.Counts(current('db')))"`
+	//	U1 []*User `kitty:"bind:user.id,created_at,name,age;getter:rds('name<>[],age>[10]')"`
+	List []*User `kitty:"bind:user.id,name,department;getter:rds(s.RawUsers(current('db')))"`
 	//	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
 	//	Name  *string `json:"-" kitty:"param:user.name;"`
 	//	MUser User    `json:"-" kitty:"master"`
+}
+
+func (*FormUser) Counts(db *gorm.DB) (interface{}, error) {
+	pi := new(interface{})
+	*pi = db.Raw("select COUNT(1) FROM users").QueryExpr()
+	return pi, nil
+}
+
+func (*FormUser) RawUsers(db *gorm.DB) (interface{}, error) {
+	pi := new(interface{})
+	*pi = db.Model(&User{}).Order("name desc").QueryExpr()
+	return pi, nil
 }
 
 // FormUserList 用户列表

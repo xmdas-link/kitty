@@ -127,7 +127,7 @@ func TestExpr(t *testing.T) {
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "rd_update('name=billgates,age=0','name=bill')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Company"), "vf(company==nil?'error')|rd_create('name=oracle,job=hr,user_id=user.id')"))
 	should.Nil(kitty.Eval(s, db, s.Field("User"), "vf(company!=nil?'error')|rd_update_if(company!=nil?'department=company.name','name=billgates')"))
-	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds('')|vf(len(this)==2?'xxx')"))
+	should.Nil(kitty.Eval(s, db, s.Field("UserSlice"), "rds()|vf(len(this)==2?'xxx')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserSlice2"), "f('user_slice')|vf(len(this)==2?'xxx')"))
 	should.Nil(kitty.Eval(s, db, s.Field("FindByName"), "f('user_slice[*].name')|vf(len(this)==2?'xxx')"))
 	should.Nil(kitty.Eval(s, db, s.Field("UserResult"), "f('user_slice')|vf(len(this)==2&&user_result[0].name=='huang'?'error1')"))
