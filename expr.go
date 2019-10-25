@@ -418,7 +418,7 @@ func (e *expr) init() {
 					var txPages *gorm.DB
 					if len(raw) > 0 {
 						gormExpr := args[0].(*interface{})
-						txPages = e.db.Raw(fmt.Sprintf("SELECT COUNT(*) FROM (%s) tmp", *gormExpr))
+						txPages = e.db.Raw("SELECT COUNT(*) FROM (?) tmp", *gormExpr)
 					} else {
 						txPages = tx.Select("COUNT(*)")
 						if !modelDeclared {

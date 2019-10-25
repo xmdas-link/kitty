@@ -35,7 +35,7 @@ type FormUpdateUser struct {
 type FormUser struct {
 	Page  uint32      `json:"-" kitty:"param;getter:set(1)" `
 	Limit uint32      `json:"-" kitty:"param;getter:set(1)" `
-	Pages *kitty.Page `kitty:"page:List;getter:page(s.Counts(current('db')))"`
+	Pages *kitty.Page `kitty:"page:List"`//;getter:page(s.Counts(current('db')))
 	//	U1 []*User `kitty:"bind:user.id,created_at,name,age;getter:rds('name<>[],age>[10]')"`
 	List []*User `kitty:"bind:user.id,name,department;getter:rds(s.RawUsers(current('db')))"`
 	//	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
