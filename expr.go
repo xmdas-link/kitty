@@ -446,6 +446,10 @@ func (e *expr) init() {
 			} else {
 				tx = tx.Select(fieldSel)
 			}
+		} else if len(raw) > 0 {
+			//may be gorm expression is : select count(1) from users
+			//so set fieldSel to current field name for pluck 
+			fieldSel = strcase.ToSnake(e.f.Name())
 		}
 
 		var err error
