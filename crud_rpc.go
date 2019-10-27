@@ -2,6 +2,7 @@ package kitty
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -38,6 +39,7 @@ func (crud *RPCCrud) Do(search *SearchCondition, action string, c Context) (inte
 			jsoniter.Config{}.Froze(),
 		}, nil
 	}
+	log.Println(err)
 	if _, ok := err.(*mysql.MySQLError); ok {
 		if kittyMode == debugCode {
 			return nil, err

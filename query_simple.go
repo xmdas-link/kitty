@@ -2,8 +2,6 @@ package kitty
 
 import (
 	"fmt"
-	"reflect"
-	"time"
 
 	"github.com/iancoleman/strcase"
 
@@ -78,45 +76,12 @@ func (q *simpleQuery) update() error {
 				w := qry.whereExpr()
 				tx = tx.Where(w, qry.value...)
 			}
-		} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
+		} else if _, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
 			resvalue := qry.value[0]
+			updates[qry.bindfield] = resvalue
 			if str := qry.nullExpr(); len(str) > 0 {
 				updates[qry.bindfield] = nil
-				continue
 			}
-			switch f.Value().(type) {
-			case *time.Time:
-				if v, ok := resvalue.(string); ok {
-					if len(v) == 0 {
-						updates[qry.bindfield] = nil
-						continue
-					}
-				}
-				VK := reflect.ValueOf(resvalue)
-				if VK.Kind() >= reflect.Int && VK.Kind() <= reflect.Float64 {
-					v := VK.Convert(reflect.TypeOf(float64(0))).Interface().(float64)
-					if v == 0 {
-						updates[qry.bindfield] = nil
-						continue
-					}
-				}
-
-				if err := q.Result.SetFieldValue(f, resvalue); err != nil {
-					return err
-				}
-				resvalue = DereferenceValue(reflect.ValueOf(f.Value()))
-			}
-			updates[qry.bindfield] = resvalue
-			/*
-				if DereferenceType(reflect.TypeOf(resvalue)).Kind() == reflect.Struct {
-					if err := f.Set(resvalue); err != nil {
-						return err
-					}
-					updateWithStrs = true
-				} else {
-					updates[qry.bindfield] = resvalue
-				}
-			*/
 		} else {
 			return fmt.Errorf("%s field error %s", modelName, qry.bindfield)
 		}
@@ -154,3 +119,42 @@ func (q *simpleQuery) update() error {
 	}
 	return nil
 }
+
+/*
+	switch f.Value().(type) {
+	case *time.Time:
+		if v, ok := resvalue.(string); ok {
+			if len(v) == 0 {
+				updates[qry.bindfield] = nil
+				continue
+			}
+		}
+		VK := reflect.ValueOf(resvalue)
+		if VK.Kind() >= reflect.Int && VK.Kind() <= reflect.Float64 {
+			v := VK.Convert(reflect.TypeOf(float64(0))).Interface().(float64)
+			if v == 0 {
+				updates[qry.bindfield] = nil
+				continue
+			}
+		}
+		if err := q.Result.SetFieldValue(f, resvalue); err != nil {
+			return err
+		}
+		resvalue = DereferenceValue(reflect.ValueOf(f.Value()))
+	case time.Time:
+		if err := q.Result.SetFieldValue(f, resvalue); err != nil {
+			return err
+		}
+		resvalue = DereferenceValue(reflect.ValueOf(f.Value()))
+	}
+*/
+/*
+	if DereferenceType(reflect.TypeOf(resvalue)).Kind() == reflect.Struct {
+		if err := f.Set(resvalue); err != nil {
+			return err
+		}
+		updateWithStrs = true
+	} else {
+		updates[qry.bindfield] = resvalue
+	}
+*/

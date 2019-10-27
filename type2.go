@@ -1,7 +1,7 @@
 package kitty
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/fatih/structs"
 	"github.com/modern-go/reflect2"
@@ -26,5 +26,6 @@ func CreateModel(name string) *Structs {
 	if v := types[name]; v != nil {
 		return CreateModelStructs(v.New())
 	}
-	panic(fmt.Sprintf("model: %s must be registered.", name))
+	log.Panicf("model: %s must be registered.", name)
+	return nil
 }

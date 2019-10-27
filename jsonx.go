@@ -31,6 +31,11 @@ type filterFieldsExtension struct {
 
 func (extension *filterFieldsExtension) UpdateStructDescriptor(structDescriptor *jsoniter.StructDescriptor) {
 	for _, binding := range structDescriptor.Fields {
+		if jsonTag := binding.Field.Tag().Get("json"); len(jsonTag) > 0 {
+			if jsonTag != "omitempty" {
+				continue
+			}
+		}
 		binding.ToNames = []string{strcase.ToSnake(binding.Field.Name())}
 		binding.FromNames = []string{strcase.ToSnake(binding.Field.Name())}
 	}

@@ -2,6 +2,7 @@ package kitty
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -33,7 +34,8 @@ func (f FieldTypeAndKind) Create() *Structs {
 	if f.t2 != nil {
 		return CreateModelStructs(f.t2.New())
 	}
-	panic(fmt.Sprintf("model: %s must be declared", f.ModelName))
+	log.Panicf("model: %s must be declared", f.ModelName)
+	return nil
 }
 
 // StructFieldInfo 结构体信息
@@ -119,7 +121,8 @@ func (s *Structs) createModel(name string) *Structs {
 		}
 	}
 
-	panic(fmt.Sprintf("model %s must be declared", name))
+	log.Panicf("model %s must be declared", name)
+	return nil
 }
 
 // CreateModelStructs ...
@@ -289,7 +292,7 @@ func (s *Structs) fillValue(src *Structs, params []string) error {
 	for _, param := range params {
 		p := strings.Split(param, "=")
 		if len(p) != 2 {
-			panic("")
+			log.Panicf("%s fillvalue %s", s.Name(), strings.Join(params, ","))
 		}
 		field := s.Field(ToCamel(trimSpace(p[0])))
 		value, err := src.getValue(trimSpace(p[1]))
@@ -317,7 +320,7 @@ type fieldList struct {
 }
 
 func (list *fieldList) getValue(param string) (interface{}, error) {
-	if len(param) > 2 && param[0] == '[' && param[len(param)-1] == ']' {
+	if len(param) >= 2 && param[0] == '[' && param[len(param)-1] == ']' {
 		return param, nil
 	}
 	if strings.Contains(param, ".") {

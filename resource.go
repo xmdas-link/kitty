@@ -1,7 +1,7 @@
 package kitty
 
 import (
-	"fmt"
+	"log"
 	"strings"
 )
 
@@ -60,7 +60,7 @@ func (res *Resource) checkValid() {
 		}
 		for _, v := range functions {
 			if strings.Contains(k, v+"(") && !strings.Contains(k, "runtime") && !strings.Contains(k, "getter") && !strings.Contains(k, "setter") {
-				panic(fmt.Errorf("%s.%s param error: need getter,setter,runtime", res.ModelName, field.Name()))
+				log.Panicf("%s.%s param error: need getter,setter,runtime", res.ModelName, field.Name())
 			}
 		}
 	}
@@ -69,7 +69,7 @@ func (res *Resource) checkValid() {
 func test(s *Structs, mf, k string) {
 	name := ToCamel(k)
 	if _, ok := s.FieldOk(name); !ok {
-		panic(fmt.Sprintf("kitty, param error :%s", mf))
+		log.Panicf("kitty, param error :%s", mf)
 	}
 }
 

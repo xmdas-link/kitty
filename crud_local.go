@@ -3,6 +3,7 @@ package kitty
 import (
 	"errors"
 	"fmt"
+	"log"
 	"runtime"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 //LocalCrud 本地操作
 type LocalCrud struct {
 	Model  string // RPC 最终会调用此，所以只能用model作为参数。
-	strs   *Structs
+	Strs   *Structs
 	DB     *gorm.DB
 	Callbk SuccessCallback
 }
@@ -32,6 +33,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			var buf [4096]byte
 			n := runtime.Stack(buf[:], false)
 			fmt.Printf("Action: %s==> %s\n", action, string(buf[:n]))
+			log.Printf("Action: %s==> %s\n", action, string(buf[:n]))
 			tx.Rollback()
 
 		}
@@ -39,7 +41,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 
 	tx = tx.Begin()
 
-	s := local.strs
+	s := local.Strs
 	if s == nil {
 		s = CreateModel(local.Model)
 	}
@@ -102,6 +104,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			jsoniter.Config{}.Froze(),
 		}, nil
 	}
+	log.Println(err)
 	if _, ok := err.(*mysql.MySQLError); ok {
 		if kittyMode == debugCode {
 			return nil, err

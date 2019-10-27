@@ -29,6 +29,7 @@ type expr struct {
 func (e *expr) init() {
 	e.params["nil"] = nil
 	e.params["s"] = e.s.raw
+	e.params["db"] = e.db
 
 	functions := e.functions
 	for k, v := range exprFuncs {
@@ -246,14 +247,16 @@ func (e *expr) init() {
 					if err != nil {
 						return nil, err
 					}
-					fname := strcase.ToSnake(trimSpace(vv[0]))
-					queryformat = append(queryformat, &fieldQryFormat{
-						bindfield:     fname,
-						model:         strcase.ToSnake(tk.ModelName),
-						withCondition: true,
-						operator:      oper + " ?",
-						value:         []interface{}{res},
-					})
+					if res != nil {
+						fname := strcase.ToSnake(trimSpace(vv[0]))
+						queryformat = append(queryformat, &fieldQryFormat{
+							bindfield:     fname,
+							model:         strcase.ToSnake(tk.ModelName),
+							withCondition: true,
+							operator:      oper + " ?",
+							value:         []interface{}{res},
+						})
+					}
 					break
 				}
 			}
@@ -267,13 +270,15 @@ func (e *expr) init() {
 				if err != nil {
 					return nil, err
 				}
-				fname := strcase.ToSnake(trimSpace(vv[0]))
-				queryformat = append(queryformat, &fieldQryFormat{
-					bindfield: fname,
-					model:     strcase.ToSnake(tk.ModelName),
-					operator:  "= ?",
-					value:     []interface{}{res},
-				})
+				if res != nil {
+					fname := strcase.ToSnake(trimSpace(vv[0]))
+					queryformat = append(queryformat, &fieldQryFormat{
+						bindfield: fname,
+						model:     strcase.ToSnake(tk.ModelName),
+						operator:  "= ?",
+						value:     []interface{}{res},
+					})
+				}
 			}
 		}
 
@@ -448,7 +453,7 @@ func (e *expr) init() {
 			}
 		} else if len(raw) > 0 {
 			//may be gorm expression is : select count(1) from users
-			//so set fieldSel to current field name for pluck 
+			//so set fieldSel to current field name for pluck
 			fieldSel = strcase.ToSnake(e.f.Name())
 		}
 
@@ -815,9 +820,9 @@ func sectionFunc(s *Structs, curf *structs.Field, sectionExp string, params map[
 						if err != nil {
 							return sectionExp, err
 						}
-						if s1, ok := v.(string); ok {
-							v = trimConsts(s1) // [billgates]
-						}
+						//if s1, ok := v.(string); ok {
+						//	v = trimConsts(s1) // [billgates]
+						//}
 						str := strings.ReplaceAll(fieldName, ".", "_")
 						str = strings.ReplaceAll(str, "[", "_")
 						str = strings.ReplaceAll(str, "]", "_")
