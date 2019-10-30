@@ -2,7 +2,6 @@ package kitty
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/iancoleman/strcase"
