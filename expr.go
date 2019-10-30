@@ -248,12 +248,18 @@ func (e *expr) init() {
 						return nil, err
 					}
 					if res != nil {
+						operator := oper + " ?"
+						if strings.Contains(oper, "IN") { // NOT IN / IN
+							operator = oper + " (?)"
+						} else if reflect.ValueOf(res).Kind() == reflect.Slice {
+							operator = "IN (?)"
+						}
 						fname := strcase.ToSnake(trimSpace(vv[0]))
 						queryformat = append(queryformat, &fieldQryFormat{
 							bindfield:     fname,
 							model:         strcase.ToSnake(tk.ModelName),
 							withCondition: true,
-							operator:      oper + " ?",
+							operator:      operator,
 							value:         []interface{}{res},
 						})
 					}
@@ -395,7 +401,13 @@ func (e *expr) init() {
 									if err != nil {
 										return nil, err
 									}
-									tx = tx.Where(fmt.Sprintf("%s %s ?", fname, oper), res)
+									operator := oper + " ?"
+									if strings.Contains(oper, "IN") { // NOT IN / IN
+										operator = oper + " (?)"
+									} else if reflect.ValueOf(res).Kind() == reflect.Slice {
+										operator = "IN (?)"
+									}
+									tx = tx.Where(fmt.Sprintf("%s %s", fname, operator), res)
 								}
 								break
 							}

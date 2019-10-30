@@ -2,6 +2,8 @@ package kitty
 
 import (
 	"fmt"
+	"reflect"
+	"time"
 
 	"github.com/iancoleman/strcase"
 
@@ -76,11 +78,18 @@ func (q *simpleQuery) update() error {
 				w := qry.whereExpr()
 				tx = tx.Where(w, qry.value...)
 			}
-		} else if _, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
-			resvalue := qry.value[0]
-			updates[qry.bindfield] = resvalue
+		} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
 			if str := qry.nullExpr(); len(str) > 0 {
 				updates[qry.bindfield] = nil
+			} else {
+				updates[qry.bindfield] = qry.value[0]
+				switch f.Value().(type) {
+				case *time.Time, time.Time:
+					if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
+						return err
+					}
+					updates[qry.bindfield] = f.Value()
+				}
 			}
 		} else {
 			return fmt.Errorf("%s field error %s", modelName, qry.bindfield)
