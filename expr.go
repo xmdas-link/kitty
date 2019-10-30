@@ -496,8 +496,11 @@ func (e *expr) init() {
 				} else {
 					if rt.Kind() >= reflect.Int && rt.Kind() <= reflect.Float64 || rt.Kind() == reflect.String {
 						objValue := makeSlice(tk.TypeOfField, 0)
-						err = tx.Pluck(fieldSel, objValue.Interface()).Error
-						res = objValue.Elem().Interface()
+						count := 0
+						if err = tx.Count(&count).Error; err == nil && count > 0 {
+							err = tx.Pluck(fieldSel, objValue.Interface()).Error
+							res = objValue.Elem().Interface()
+						}
 					}
 				}
 			} else {
@@ -512,10 +515,14 @@ func (e *expr) init() {
 		default:
 			if tk.TypeOfField.Kind() >= reflect.Int && tk.TypeOfField.Kind() <= reflect.Float64 || tk.TypeOfField.Kind() == reflect.String {
 				objValue := makeSlice(tk.TypeOfField, 0)
-				err = tx.Pluck(fieldSel, objValue.Interface()).Error
-				if objValue.Elem().Len() > 0 {
-					res = objValue.Elem().Index(0).Interface()
+				count := 0
+				if err = tx.Count(&count).Error; err == nil && count > 0 {
+					err = tx.Pluck(fieldSel, objValue.Interface()).Error
+					if objValue.Elem().Len() > 0 {
+						res = objValue.Elem().Index(0).Interface()
+					}
 				}
+
 			}
 		}
 
