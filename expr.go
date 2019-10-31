@@ -167,6 +167,10 @@ func (e *expr) init() {
 		return v, nil
 	}
 	functions["set"] = func(args ...interface{}) (interface{}, error) {
+		if s, ok := args[0].(string); ok && s == "nil" {
+			e.f.Zero()
+			return nil, nil
+		}
 		return args[0], nil
 	}
 	//创建单条记录
@@ -495,9 +499,9 @@ func (e *expr) init() {
 					res = objValue.Elem().Interface()
 				} else {
 					if rt.Kind() >= reflect.Int && rt.Kind() <= reflect.Float64 || rt.Kind() == reflect.String {
-						objValue := makeSlice(tk.TypeOfField, 0)
 						count := 0
 						if err = tx.Count(&count).Error; err == nil && count > 0 {
+							objValue := makeSlice(tk.TypeOfField, 0)
 							err = tx.Pluck(fieldSel, objValue.Interface()).Error
 							res = objValue.Elem().Interface()
 						}
@@ -514,15 +518,14 @@ func (e *expr) init() {
 			return nil, e.f.Set(pi)
 		default:
 			if tk.TypeOfField.Kind() >= reflect.Int && tk.TypeOfField.Kind() <= reflect.Float64 || tk.TypeOfField.Kind() == reflect.String {
-				objValue := makeSlice(tk.TypeOfField, 0)
 				count := 0
 				if err = tx.Count(&count).Error; err == nil && count > 0 {
+					objValue := makeSlice(tk.TypeOfField, 0)
 					err = tx.Pluck(fieldSel, objValue.Interface()).Error
 					if objValue.Elem().Len() > 0 {
 						res = objValue.Elem().Index(0).Interface()
 					}
 				}
-
 			}
 		}
 
