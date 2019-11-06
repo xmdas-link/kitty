@@ -2,7 +2,6 @@ package kitty
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"runtime"
 	"time"
@@ -23,23 +22,6 @@ type LocalCrud struct {
 
 // Do 本地执行db操作
 func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (interface{}, error) {
-	//	if err := search.CheckParamValid(crud.Model); err != nil {
-	//		return nil, err
-	//	}
-	tx := local.DB
-
-	defer func() {
-		if r := recover(); r != nil {
-			var buf [4096]byte
-			n := runtime.Stack(buf[:], false)
-			fmt.Printf("Action: %s==> %s\n", action, string(buf[:n]))
-			log.Printf("Action: %s==> %s\n", action, string(buf[:n]))
-			tx.Rollback()
-
-		}
-	}()
-
-	tx = tx.Begin()
 
 	s := local.Strs
 	if s == nil {
@@ -55,35 +37,8 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	if err := vd.Validate(s.raw); err != nil {
 		return nil, err
 	}
-	var (
-		res interface{}
-		err error
-	)
 
-	crud := newcrud(&config{
-		strs:   s,
-		search: search,
-		db:     tx,
-		ctx:    c,
-		callbk: local.Callbk,
-	})
-
-	switch action {
-	case "C":
-		res, err = crud.createObj()
-	case "R":
-		res, err = crud.queryObj()
-	case "U":
-		res, err = crud.updateObj()
-	default:
-		return nil, errors.New("unknown model action")
-	}
-
-	if err == nil {
-		err = tx.Commit().Error
-	} else {
-		tx.Rollback()
-	}
+	res, err := local.Action(s, search, action, c)
 
 	if err == nil {
 		nameAs := make(map[string][]string)
@@ -112,4 +67,49 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		return nil, errors.New("数据库执行错误")
 	}
 	return nil, err
+}
+
+// Action ...
+func (local *LocalCrud) Action(s *Structs, search *SearchCondition, action string, c Context) (interface{}, error) {
+	var (
+		res interface{}
+		err error
+	)
+	tx := local.DB.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			var buf [4096]byte
+			n := runtime.Stack(buf[:], false)
+			log.Printf("Action: %s==> %s\n", action, string(buf[:n]))
+			tx.Rollback()
+		}
+	}()
+
+	crud := newcrud(&config{
+		strs:   s,
+		search: search,
+		db:     tx,
+		ctx:    c,
+		callbk: local.Callbk,
+	})
+
+	switch action {
+	case "C":
+		res, err = crud.createObj()
+	case "R":
+		res, err = crud.queryObj()
+	case "U":
+		res, err = crud.updateObj()
+	default:
+		return nil, errors.New("unknown model action")
+	}
+
+	if err == nil {
+		err = tx.Commit().Error
+	} else {
+		tx.Rollback()
+	}
+
+	return res, err
 }

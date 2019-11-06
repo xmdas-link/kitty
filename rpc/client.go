@@ -31,7 +31,20 @@ type KittyClientRPC struct {
 // Call 调用rpc服务端
 func (rpc *KittyClientRPC) Call(search *kitty.SearchCondition, action string, c kitty.Context) (interface{}, error) {
 	if action == "RPC" {
-		return rpc.localCall(search, c)
+		res, err := rpc.localCall(search, c)
+		if err != nil {
+			return nil, err
+		}
+		s := kitty.CreateModelStructs(res)
+		if err := kitty.Setter(s, search.Params, nil, c); err != nil {
+			return nil, err
+		}
+		if rpc.Callbk != nil {
+			if err := rpc.Callbk(s, nil); err != nil {
+				return nil, err
+			}
+		}
+		return res, nil
 	}
 	res, err := json.Marshal(search)
 	if err != nil {
@@ -82,6 +95,15 @@ type PageDevice struct {
 }
 */
 
+type localRPC struct {
+	name        string
+	client      *kitty.Structs
+	method      string
+	methodField string
+	param       *kitty.Structs
+	result      *structs.Field
+}
+
 func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Context) (interface{}, error) {
 
 	defer func() {
@@ -101,15 +123,6 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 		rpcParams = search.Params
 	)
 	ctx, _ := c.GetCtxInfo("ContextRPC")
-
-	type localRPC struct {
-		name        string
-		client      *kitty.Structs
-		method      string
-		methodField string
-		param       *kitty.Structs
-		result      *structs.Field
-	}
 
 	if err := vd.Validate(s.Raw()); err != nil {
 		return nil, err
@@ -251,21 +264,9 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 				}
 			}
 		}
-
 		if err := rpc.result.Set(rspValue); err != nil {
 			return nil, err
 		}
-
 	}
-	if err := kitty.Setter(s, rpcParams, nil, c); err != nil {
-		return nil, err
-	}
-
-	if rpc.Callbk != nil {
-		if err := rpc.Callbk(s, nil); err != nil {
-			return nil, err
-		}
-	}
-
 	return s.Raw(), nil
 }

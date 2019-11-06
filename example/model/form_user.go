@@ -38,7 +38,8 @@ type FormUser struct {
 	Pages *kitty.Page `json:"page" kitty:"page:List;getter:page(s.Counts(db))"`
 	Now   *string     `kitty:"getter:now()"`
 	U1    []*User     `kitty:"getter:rds('created_at<now')"`
-	List  []*User     `kitty:"getter:rds(s.RawUsers(current('db')))"`
+//	List  []*User     `kitty:"getter:rds(s.RawUsers(db))"`
+	CountUser int     `kitty:"getter:rds( (s.Counts(db)) , 'user')"`
 	//UpdateTime string      `kitty:"getter:now()"`
 	User *User `kitty:"getter:rd_update('updated_at=now()','id=6')"`
 	//	ID    *uint32 `json:"-" kitty:"param:user.id;" vd:"$!=nil||(Name)$!=nil;msg:'id or name required.'"`
@@ -48,7 +49,7 @@ type FormUser struct {
 
 func (*FormUser) Counts(db *gorm.DB) (interface{}, error) {
 	pi := new(interface{})
-	*pi = db.Raw("select COUNT(1) FROM users").QueryExpr()
+	*pi = db.Raw("select COUNT(1) as count_user  FROM users").QueryExpr()
 	return pi, nil
 }
 

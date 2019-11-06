@@ -20,6 +20,7 @@ type KittyRPCService struct {
 	DB     *gorm.DB
 	Callbk kitty.SuccessCallback
 	Ctx    SrvContext
+	Params map[string]interface{}
 }
 
 type rpcContext struct {
@@ -52,6 +53,7 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 	if err != nil {
 		return err
 	}
+	search.Params = rpc.Params
 	if rpc.DB == nil {
 		obj, err := rpc.Ctx.GetCtxInfo(ctx, "ContextDB")
 		if err == nil {
@@ -60,19 +62,27 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 			return err
 		}
 	}
+	rpcCtx := &rpcContext{
+		ctx:    ctx,
+		srvCtx: rpc.Ctx,
+	}
+
+	cliRPC := &KittyClientRPC{
+		Model: kitty.CreateModel(req.Model).Raw(),
+	}
+	res, err = cliRPC.localCall(&search, rpcCtx)
+	if err != nil {
+		return err
+	}
 
 	crud := &kitty.LocalCrud{
-		Model:  req.Model,
+		Strs:   kitty.CreateModelStructs(res),
 		DB:     rpc.DB,
 		Callbk: rpc.Callbk,
 	}
 	fmt.Printf("rpc %s call\n", req.Model)
 
-	rpcCtx := &rpcContext{
-		ctx:    ctx,
-		srvCtx: rpc.Ctx,
-	}
-	if res, err = crud.Do(&search, req.Action, rpcCtx); err == nil && res != nil {
+	if res, err = crud.Action(&search, req.Action, rpcCtx); err == nil && res != nil {
 		if jsonbytes, err = json.Marshal(res); err == nil {
 			rsp.Msg = string(jsonbytes)
 			return nil

@@ -63,7 +63,6 @@ func (q *simpleQuery) update() error {
 	tx := q.db.Model(q.Result.raw)
 
 	updates := make(map[string]interface{})
-	//updateWithStrs := false
 
 	qryformats := q.qryParams
 	qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
@@ -98,12 +97,7 @@ func (q *simpleQuery) update() error {
 	if whereCount == 0 {
 		return fmt.Errorf("unable update %s, missing query condition", modelName)
 	}
-	/*
-		if updateWithStrs {
-			tx = tx.Updates(q.Result.raw)
-			q.search.ReturnCount = int(tx.RowsAffected)
-		}
-	*/
+	
 	if len(updates) > 0 {
 		tx = tx.Updates(updates)
 		q.search.ReturnCount = int(tx.RowsAffected)
