@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"runtime"
 	"strings"
@@ -28,11 +29,41 @@ type KittyClientRPC struct {
 	Callbk     kitty.SuccessCallback
 }
 
+func init() {
+	jsoniter.RegisterTypeDecoder("time.Time", &kitty.TimeAsString{})
+}
+
 // Call 调用rpc服务端
 func (rpc *KittyClientRPC) Call(search *kitty.SearchCondition, action string, c kitty.Context) (interface{}, error) {
 	if action == "RPC" {
-		return rpc.localCall(search, c)
+		s := kitty.CreateModelStructs(rpc.Model).New()
+		if err := s.ParseFormValues(search.FormValues); err != nil {
+			return nil, err
+		}
+		if err := vd.Validate(s.Raw()); err != nil {
+			return nil, err
+		}
+
+		if err := kitty.Getter(s, search.Params, nil, c); err != nil {
+			return nil, err
+		}
+
+		err := rpc.localCall(s, search, c)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := kitty.Setter(s, search.Params, nil, c); err != nil {
+			return nil, err
+		}
+		if rpc.Callbk != nil {
+			if err := rpc.Callbk(s, nil); err != nil {
+				return nil, err
+			}
+		}
+		return s.Raw(), nil
 	}
+
 	res, err := json.Marshal(search)
 	if err != nil {
 		return nil, err
@@ -82,41 +113,28 @@ type PageDevice struct {
 }
 */
 
-func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Context) (interface{}, error) {
+type localRPC struct {
+	name        string
+	client      *kitty.Structs
+	method      string
+	methodField string
+	param       *kitty.Structs
+	result      *structs.Field
+}
+
+func (rpc *KittyClientRPC) localCall(s *kitty.Structs, search *kitty.SearchCondition, c kitty.Context) error {
 
 	defer func() {
 		if r := recover(); r != nil {
 			var buf [4096]byte
 			n := runtime.Stack(buf[:], false)
-			fmt.Printf("Action: %s==> %s\n", "localRPC", string(buf[:n]))
+			log.Printf("Panic %s, Action: %s==> %s\n", r, "localRPC", string(buf[:n]))
 		}
 	}()
-
-	s := kitty.CreateModelStructs(rpc.Model).New()
-	if err := s.ParseFormValues(search.FormValues); err != nil {
-		return nil, err
-	}
-
 	var (
 		rpcParams = search.Params
 	)
 	ctx, _ := c.GetCtxInfo("ContextRPC")
-
-	type localRPC struct {
-		name        string
-		client      *kitty.Structs
-		method      string
-		methodField string
-		param       *kitty.Structs
-		result      *structs.Field
-	}
-
-	if err := vd.Validate(s.Raw()); err != nil {
-		return nil, err
-	}
-	if err := kitty.Getter(s, rpcParams, nil, c); err != nil {
-		return nil, err
-	}
 
 	rpcs := make([]*localRPC, 0)
 	var getrpc = func(client string, method string) *localRPC {
@@ -145,7 +163,7 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 				// GetRequest   *schoolProto.GetRequest  `json:"-" kitty:"protocol:schoolClient.GetSchool"`
 				methodStrs := tk.Create()
 				if err := f.Set(methodStrs.Raw()); err != nil {
-					return nil, err
+					return err
 				}
 				v := strings.Split(protocol, ".")
 				rpc := getrpc(v[0], v[1])
@@ -169,22 +187,22 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 						tk := kitty.TypeKind(f)
 						paramStrs = tk.Create()
 						if err := f.Set(paramStrs.Raw()); err != nil {
-							return nil, err
+							return err
 						}
 						rpc.param.Field("Model").Set(tk.ModelName)
 						isKittyRequest = true
 					} else if strings.Contains(param, paramformat) {
 						if runtime := kitty.GetSub(k, "runtime"); len(runtime) > 0 {
 							if err := kitty.Eval(s, nil, f, runtime); err != nil {
-								return nil, err
+								return err
 							}
 						}
 						if ff, ok := paramStrs.FieldOk(v[1]); ok {
 							if err := paramStrs.SetFieldValue(ff, f.Value()); err != nil {
-								return nil, err
+								return err
 							}
 						} else {
-							return nil, fmt.Errorf("%s field %s not exist", v[0], v[1])
+							return fmt.Errorf("%s field %s not exist", v[0], v[1])
 						}
 
 					}
@@ -220,17 +238,16 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 			}
 			res, err := json.Marshal(search)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			rpc.param.Field("Search").Set(string(res))
 		}
 
-		var a = func(options *client.CallOptions) {
-		}
+		var a = func(options *client.CallOptions) {}
 		values := rpc.client.CallMethod(rpc.method, reflect.ValueOf(ctx), reflect.ValueOf(rpc.param.Raw()), reflect.ValueOf(a))
 
 		if kitty.DereferenceValue(values[1]).Kind() != reflect.Invalid {
-			return nil, values[1].Interface().(error)
+			return values[1].Interface().(error)
 		}
 
 		rspValue := values[0].Interface()
@@ -239,33 +256,21 @@ func (rpc *KittyClientRPC) localCall(search *kitty.SearchCondition, c kitty.Cont
 			if len(rpcrsp.Msg) > 0 {
 				res := &kitty.CrudResult{}
 				if err := json.Unmarshal([]byte(rpcrsp.Msg), res); err != nil {
-					return nil, err
+					return err
 				}
 				if res.Code != 1 {
-					return nil, errors.New(res.Message)
+					return errors.New(res.Message)
 				}
 				obj, _ := json.Marshal(res.Data)
 				rspValue = kitty.TypeKind(rpc.result).Create().Raw()
 				if err := json.Unmarshal(obj, rspValue); err != nil {
-					return nil, fmt.Errorf("rpc call %s parse error", rpc.name)
+					return fmt.Errorf("rpc call %s parse error %s", rpc.name, err.Error())
 				}
 			}
 		}
-
 		if err := rpc.result.Set(rspValue); err != nil {
-			return nil, err
-		}
-
-	}
-	if err := kitty.Setter(s, rpcParams, nil, c); err != nil {
-		return nil, err
-	}
-
-	if rpc.Callbk != nil {
-		if err := rpc.Callbk(s, nil); err != nil {
-			return nil, err
+			return err
 		}
 	}
-
-	return s.Raw(), nil
+	return nil
 }

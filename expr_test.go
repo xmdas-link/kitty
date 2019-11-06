@@ -64,7 +64,7 @@ type UserResult struct {
 
 type Test struct {
 	UserSlice  []*User
-	UserSlice2  []*User
+	UserSlice2 []*User
 	UserResult []*UserResult
 	User1      *User
 	User       *User
@@ -76,6 +76,7 @@ type Test struct {
 	FindByName []string
 	Names      *interface{}
 	Ages       *interface{}
+	AgePtr     *int
 }
 
 var db *gorm.DB
@@ -140,6 +141,8 @@ func TestExpr(t *testing.T) {
 
 	should.Nil(kitty.Eval(s, db, s.Field("Ages"), "rds('','user.age')|vf(this!=nil?'err')"))
 	should.Nil(kitty.Eval(s, db, s.Field("Age"), "count(f('ages'))|vf(this==2?'sss')"))
+	should.Nil(kitty.Eval(s, db, s.Field("AgePtr"), "set(11)|vf(this==11?'errror1')"))
+	should.Nil(kitty.Eval(s, db, s.Field("AgePtr"), "set('nil')|vf(this==nil?'error2')"))
 
 }
 func TestVf(t *testing.T) {

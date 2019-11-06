@@ -29,6 +29,6 @@ func (c *Result) MarshalJSON() ([]byte, error) {
 	for k, v := range c.NameAs {
 		c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, v, k})
 	}
-	jsoniter.RegisterTypeEncoder("time.Time", &timeAsString{})
+	jsoniter.RegisterTypeEncoder("time.Time", &TimeAsString{})
 	return c.Cfg.Marshal(c.CrudResult)
 }

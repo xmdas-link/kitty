@@ -18,7 +18,6 @@ type config struct {
 	search *SearchCondition //查询条件
 	db     *gorm.DB         //db
 	ctx    Context          //上下文
-	callbk SuccessCallback  //成功回调
 }
 
 type crud struct {
@@ -59,7 +58,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 		search = crud.search
 		db     = crud.db
 		c      = crud.ctx
-		callbk = crud.callbk
 	)
 
 	kittys := &kittys{
@@ -72,9 +70,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 	}
 	if len(kittys.kittys) == 0 {
 		return crud.common()
-	}
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
 	}
 
 	Page := &Page{}
@@ -105,16 +100,6 @@ func (crud *crud) queryObj() (interface{}, error) {
 		}
 	}
 
-	if err = Setter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
-	if callbk != nil {
-		if err = callbk(s, db); err != nil {
-			return nil, err
-		}
-	}
-
 	if f, ok := s.FieldOk("Pages"); ok && search.Page != nil {
 		f.Set(search.Page)
 	}
@@ -128,8 +113,6 @@ func (crud *crud) createObj() (interface{}, error) {
 		s      = crud.strs
 		search = crud.search
 		db     = crud.db
-		c      = crud.ctx
-		callbk = crud.callbk
 	)
 
 	kittys := &kittys{
@@ -141,9 +124,6 @@ func (crud *crud) createObj() (interface{}, error) {
 	}
 	if len(kittys.kittys) == 0 {
 		return crud.common()
-	}
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
 	}
 
 	qry := &simpleQuery{
@@ -176,16 +156,6 @@ func (crud *crud) createObj() (interface{}, error) {
 			return nil, err
 		}
 	}
-
-	if err = Setter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-	if callbk != nil {
-		if err = callbk(s, db); err != nil {
-			return nil, err
-		}
-	}
-
 	return s.raw, nil
 }
 
@@ -194,8 +164,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 		s      = crud.strs
 		search = crud.search
 		db     = crud.db
-		c      = crud.ctx
-		callbk = crud.callbk
 	)
 
 	kittys := &kittys{
@@ -207,10 +175,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 	}
 	if len(kittys.kittys) == 0 {
 		return crud.common()
-	}
-
-	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
 	}
 
 	qry := &simpleQuery{
@@ -233,16 +197,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 	if err := qry.update(); err != nil {
 		return nil, err
 	}
-	if err := Setter(s, make(map[string]interface{}), db, c); err != nil {
-		return nil, err
-	}
-
-	if callbk != nil {
-		if err := callbk(s, db); err != nil {
-			return nil, err
-		}
-	}
-
 	return s.raw, nil
 }
 
@@ -257,26 +211,5 @@ func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c Context) (inte
 }
 
 func (crud *crud) common() (interface{}, error) {
-	var (
-		s      = crud.strs
-		db     = crud.db
-		c      = crud.ctx
-		callbk = crud.callbk
-	)
-
-	params := make(map[string]interface{})
-	if err := Getter(s, params, db, c); err != nil {
-		return nil, err
-	}
-	if err := Setter(s, params, db, c); err != nil {
-		return nil, err
-	}
-
-	if callbk != nil {
-		if err := callbk(s, db); err != nil {
-			return nil, err
-		}
-	}
-
-	return s.raw, nil
+	return crud.strs.raw, nil
 }

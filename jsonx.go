@@ -37,7 +37,6 @@ func (extension *filterFieldsExtension) UpdateStructDescriptor(structDescriptor 
 			}
 		}
 		binding.ToNames = []string{strcase.ToSnake(binding.Field.Name())}
-		binding.FromNames = []string{strcase.ToSnake(binding.Field.Name())}
 	}
 	if len(extension.Name) > 0 {
 		structType := structDescriptor.Type.(*reflect2.UnsafeStructType)
@@ -65,21 +64,26 @@ func (extension *filterFieldsExtension) UpdateStructDescriptor(structDescriptor 
 	}
 }
 
-type timeAsString struct {
+//TimeAsString format time.Time as string
+type TimeAsString struct {
 	precision time.Duration
 }
 
-func (codec *timeAsString) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
+//Decode string to time.Time
+func (codec *TimeAsString) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
 	//	nanoseconds := iter.ReadInt64() * codec.precision.Nanoseconds()
 	stamp, _ := time.ParseInLocation("2006-01-02 15:04:05", iter.ReadString(), time.Local)
 	*((*time.Time)(ptr)) = stamp
 }
 
-func (codec *timeAsString) IsEmpty(ptr unsafe.Pointer) bool {
+//IsEmpty ..
+func (codec *TimeAsString) IsEmpty(ptr unsafe.Pointer) bool {
 	ts := *((*time.Time)(ptr))
 	return ts.UnixNano() == 0
 }
-func (codec *timeAsString) Encode(ptr unsafe.Pointer, stream *jsoniter.Stream) {
+
+//Encode time.Time to string
+func (codec *TimeAsString) Encode(ptr unsafe.Pointer, stream *jsoniter.Stream) {
 	ts := *((*time.Time)(ptr))
 	stream.WriteString(ts.Format("2006-01-02 15:04:05"))
 	//	stream.WriteInt64(ts.UnixNano() / codec.precision.Nanoseconds())

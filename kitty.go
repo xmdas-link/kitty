@@ -84,6 +84,8 @@ func (f *fieldBinding) selectAs() string {
 			fieldsFormat = append(fieldsFormat, fmt.Sprintf("%s.%s", f.TableName, field))
 		}
 		return strings.Join(fieldsFormat, ", ")
+	} else if len(f.BindModelField) > 0 {
+		return fmt.Sprintf("%s.%s", f.TableName, f.BindModelField)
 	}
 	return fmt.Sprintf("%s AS %s", f.tableWithFieldName(), strcase.ToSnake(f.FieldName))
 }
