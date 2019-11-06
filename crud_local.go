@@ -4,12 +4,9 @@ import (
 	"errors"
 	"log"
 	"runtime"
-	"time"
 
 	vd "github.com/bytedance/go-tagexpr/validator"
-	"github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
-	jsoniter "github.com/json-iterator/go"
 )
 
 //LocalCrud 本地操作
@@ -51,33 +48,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 
 	res, err := local.Action(s, search, action, c)
 
-	if err == nil {
-		nameAs := make(map[string][]string)
-		result := CrudResult{
-			Code: 1,
-			Ref:  time.Now().UnixNano() / 1e6,
-		}
-		if res != nil {
-			result.Data = res
-			s.nameAs(nameAs)
-		} else if action == "R" {
-			result.Code = 0
-			result.Message = "发生未知错误"
-		}
-		return &Result{
-			result,
-			nameAs,
-			jsoniter.Config{}.Froze(),
-		}, nil
-	}
-	log.Println(err)
-	if _, ok := err.(*mysql.MySQLError); ok {
-		if kittyMode == debugCode {
-			return nil, err
-		}
-		return nil, errors.New("数据库执行错误")
-	}
-	return nil, err
+	return res, err
 }
 
 // Action ...
