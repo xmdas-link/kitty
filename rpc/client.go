@@ -13,7 +13,6 @@ import (
 	"github.com/fatih/structs"
 	"github.com/iancoleman/strcase"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/json-iterator/go/extra"
 	"github.com/micro/go-micro/client"
 
 	"github.com/xmdas-link/kitty"
@@ -30,8 +29,20 @@ type KittyClientRPC struct {
 	Callbk     kitty.SuccessCallback
 }
 
+type filterFieldsExtension struct {
+	jsoniter.DummyExtension
+}
+
+func (extension *filterFieldsExtension) UpdateStructDescriptor(structDescriptor *jsoniter.StructDescriptor) {
+	for _, binding := range structDescriptor.Fields {
+		binding.ToNames = []string{strcase.ToSnake(binding.Field.Name())}
+		binding.FromNames = []string{strcase.ToSnake(binding.Field.Name())}
+	}
+}
+
 func init() {
-	extra.SetNamingStrategy(extra.LowerCaseWithUnderscores)
+	//    extra.SetNamingStrategy(extra.LowerCaseWithUnderscores)
+	jsoniter.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}})
 	jsoniter.RegisterTypeDecoder("time.Time", &kitty.TimeAsString{})
 }
 
