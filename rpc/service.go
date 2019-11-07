@@ -70,7 +70,7 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 	search.Params = make(map[string]interface{})
 
 	crud := &kitty.LocalCrud{
-		Strs:   kitty.CreateModelStructs(res),
+		Model:  req.Model,
 		DB:     rpc.DB,
 		Callbk: rpc.Callbk,
 	}
