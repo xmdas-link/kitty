@@ -583,6 +583,9 @@ func (s *Structs) buildFormQuery(model string) []*fieldQryFormat {
 				if strings.Contains(k, "condition") {
 					q.withCondition = true
 				}
+				if strings.Contains(k, "ORDER") {
+					q.order = true
+				}
 				query = append(query, q)
 			}
 		}
