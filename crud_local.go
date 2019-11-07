@@ -93,9 +93,14 @@ func (local *LocalCrud) Action(s *Structs, search *SearchCondition, action strin
 			err = local.Callbk(s, tx.New())
 		}
 	}
+
 	if err == nil {
 		err = tx.Commit().Error
+	} else {
+		tx.Rollback()
+	}
 
+	if err == nil {
 		nameAs := make(map[string][]string)
 		result := CrudResult{
 			Code: 1,
@@ -114,7 +119,7 @@ func (local *LocalCrud) Action(s *Structs, search *SearchCondition, action strin
 			jsoniter.Config{}.Froze(),
 		}, nil
 	}
-	tx.Rollback()
+
 	if _, ok := err.(*mysql.MySQLError); ok {
 		if kittyMode == debugCode {
 			return nil, err

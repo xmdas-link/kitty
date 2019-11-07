@@ -54,6 +54,9 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 		return err
 	}
 	search.Params = rpc.Params
+	if search.Params == nil {
+		search.Params = make(map[string]interface{})
+	}
 	if rpc.DB == nil {
 		obj, err := rpc.Ctx.GetCtxInfo(ctx, "ContextDB")
 		if err == nil {
@@ -66,8 +69,6 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 		ctx:    ctx,
 		srvCtx: rpc.Ctx,
 	}
-
-	search.Params = make(map[string]interface{})
 
 	crud := &kitty.LocalCrud{
 		Model:  req.Model,
