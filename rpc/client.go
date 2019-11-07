@@ -13,6 +13,7 @@ import (
 	"github.com/fatih/structs"
 	"github.com/iancoleman/strcase"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/json-iterator/go/extra"
 	"github.com/micro/go-micro/client"
 
 	"github.com/xmdas-link/kitty"
@@ -30,6 +31,7 @@ type KittyClientRPC struct {
 }
 
 func init() {
+	extra.SetNamingStrategy(extra.LowerCaseWithUnderscores)
 	jsoniter.RegisterTypeDecoder("time.Time", &kitty.TimeAsString{})
 }
 
