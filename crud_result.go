@@ -23,12 +23,15 @@ func (c *Result) JsonAPI(j jsoniter.API) {
 	c.Cfg = j
 }
 
+func init() {
+	jsoniter.RegisterTypeEncoder("time.Time", &TimeAsString{})
+}
+
 // MarshalJSON ...
 func (c *Result) MarshalJSON() ([]byte, error) {
 	c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, []string{}, ""})
 	for k, v := range c.NameAs {
 		c.Cfg.RegisterExtension(&filterFieldsExtension{jsoniter.DummyExtension{}, v, k})
 	}
-	jsoniter.RegisterTypeEncoder("time.Time", &TimeAsString{})
 	return c.Cfg.Marshal(c.CrudResult)
 }
