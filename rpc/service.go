@@ -36,6 +36,9 @@ func (c *rpcContext) CurrentUID() (string, error) {
 	return s.(string), nil
 }
 func (c *rpcContext) GetCtxInfo(s string) (interface{}, error) {
+	if s == "ContextRPC" {
+		return c.ctx, nil
+	}
 	return c.srvCtx.GetCtxInfo(c.ctx, s)
 }
 
