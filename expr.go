@@ -571,7 +571,7 @@ func (e *expr) init() {
 			*pi = res
 			return nil, e.f.Set(pi)
 		}
-		return q.queryObj()
+		return q.subQueryObj()
 	}
 
 	// create kitty model
@@ -591,7 +591,7 @@ func (e *expr) init() {
 					db:     e.db.New(),
 					ctx:    e.ctx,
 				})
-				if _, err := crud.createObj(); err != nil {
+				if _, err := crud.subCreateObj(); err != nil {
 					return nil, err
 				}
 			}
@@ -617,7 +617,7 @@ func (e *expr) init() {
 			search: &SearchCondition{},
 			db:     e.db,
 			ctx:    e.ctx,
-		}).createObj()
+		}).subCreateObj()
 	}
 
 	// update kitty model
@@ -637,7 +637,7 @@ func (e *expr) init() {
 					db:     e.db.New(),
 					ctx:    e.ctx,
 				})
-				if _, err := crud.updateObj(); err != nil {
+				if _, err := crud.subUpdateObj(); err != nil {
 					return nil, err
 				}
 			}
@@ -654,7 +654,7 @@ func (e *expr) init() {
 			search: &SearchCondition{},
 			db:     e.db,
 			ctx:    e.ctx,
-		}).updateObj()
+		}).subUpdateObj()
 	}
 
 	functions["vf"] = func(args ...interface{}) (interface{}, error) {

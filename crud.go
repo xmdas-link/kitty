@@ -52,6 +52,25 @@ func (crud *crud) queryExpr() (interface{}, error) {
 	return qry.query().QueryExpr(), nil
 }
 
+func (crud *crud) subQueryObj() (interface{}, error) {
+	var (
+		s  = crud.strs
+		db = crud.db
+		c  = crud.ctx
+	)
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+
+	if _, err := crud.queryObj(); err != nil {
+		return nil, err
+	}
+	if err := Setter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+	return s.raw, nil
+}
+
 func (crud *crud) queryObj() (interface{}, error) {
 	var (
 		s      = crud.strs
@@ -107,6 +126,25 @@ func (crud *crud) queryObj() (interface{}, error) {
 	return s.raw, nil
 }
 
+func (crud *crud) subCreateObj() (interface{}, error) {
+	var (
+		s  = crud.strs
+		db = crud.db
+		c  = crud.ctx
+	)
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+
+	if _, err := crud.createObj(); err != nil {
+		return nil, err
+	}
+	if err := Setter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+	return s.raw, nil
+}
+
 // CreateObj ...
 func (crud *crud) createObj() (interface{}, error) {
 	var (
@@ -159,6 +197,25 @@ func (crud *crud) createObj() (interface{}, error) {
 	return s.raw, nil
 }
 
+func (crud *crud) subUpdateObj() (interface{}, error) {
+	var (
+		s  = crud.strs
+		db = crud.db
+		c  = crud.ctx
+	)
+	if err := Getter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+
+	if _, err := crud.updateObj(); err != nil {
+		return nil, err
+	}
+	if err := Setter(s, make(map[string]interface{}), db, c); err != nil {
+		return nil, err
+	}
+	return s.raw, nil
+}
+
 func (crud *crud) updateObj() (interface{}, error) {
 	var (
 		s      = crud.strs
@@ -198,16 +255,6 @@ func (crud *crud) updateObj() (interface{}, error) {
 		return nil, err
 	}
 	return s.raw, nil
-}
-
-func queryObj(s *Structs, search *SearchCondition, db *gorm.DB, c Context) (interface{}, error) {
-	crud := newcrud(&config{
-		strs:   s,
-		search: search,
-		db:     db,
-		ctx:    c,
-	})
-	return crud.queryObj()
 }
 
 func (crud *crud) common() (interface{}, error) {
