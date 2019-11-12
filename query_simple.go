@@ -2,6 +2,7 @@ package kitty
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/iancoleman/strcase"
@@ -87,12 +88,20 @@ func (q *simpleQuery) update() error {
 				updates[qry.bindfield] = nil
 			} else {
 				updates[qry.bindfield] = qry.value[0]
-				switch f.Value().(type) {
-				case *time.Time, time.Time:
+				tk := TypeKind(f)
+				if tk.KindOfField >= reflect.Bool && tk.KindOfField <= reflect.Float64 || tk.KindOfField == reflect.String {
 					if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
 						return err
 					}
 					updates[qry.bindfield] = f.Value()
+				} else {
+					switch f.Value().(type) {
+					case *time.Time, time.Time:
+						if err := q.Result.SetFieldValue(f, qry.value[0]); err != nil {
+							return err
+						}
+						updates[qry.bindfield] = f.Value()
+					}
 				}
 			}
 		} else {
