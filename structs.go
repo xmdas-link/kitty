@@ -72,8 +72,8 @@ func (f *fieldQryFormat) nullExpr() string {
 
 func (f *fieldQryFormat) gormExpr() interface{} {
 	if len(f.value) == 1 {
-		if g, ok := f.value[0].(interface{}); ok {
-			return g
+		if g, ok := f.value[0].(*interface{}); ok {
+			return *g
 		}
 	}
 	return nil
@@ -704,14 +704,8 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 		return &fieldQryFormat{operator: "IN (?)", value: []interface{}{singleValue.Interface()}}
 	} else if typeKind.KindOfField == reflect.Interface {
 		// 碰到这个类型，为gorm的expr
-		singleValue = reflect.ValueOf(field.Value()).Elem()
-		return &fieldQryFormat{operator: fmt.Sprintf("%s (?)", operator), value: []interface{}{singleValue.Interface()}}
+		return &fieldQryFormat{operator: fmt.Sprintf("%s (?)", operator), value: []interface{}{field.Value()}}
 	}
-	//	if str, ok := singleValue.Interface().(string); ok {
-	//		if len(str) > 2 && str[0] == '[' && str[len(str)-1] == ']' {
-	//			return &fieldQryFormat{operator: fmt.Sprintf("%s %s", operator, trimConsts(str))}
-	//		}
-	//	}
 	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}
 }
 
