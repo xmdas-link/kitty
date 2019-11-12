@@ -78,6 +78,7 @@ func (f *fieldQryFormat) gormExpr() interface{} {
 	}
 	return nil
 }
+
 func (f *fieldQryFormat) whereExpr() string {
 	return fmt.Sprintf("%s %s", f.bindfield, f.operator)
 }
