@@ -30,6 +30,8 @@ func (q *joinQuery) prepare() *gorm.DB {
 	for _, v := range q.Where {
 		if str := v.nullExpr(); len(str) > 0 {
 			tx = tx.Where(str)
+		} else if g := v.gormExpr(); g != nil {
+			tx = tx.Where("?", g)
 		} else {
 			tx = tx.Where(v.whereExpr(), v.value...)
 		}

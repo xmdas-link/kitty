@@ -23,7 +23,9 @@ func (q *simpleQuery) create() (interface{}, error) {
 	modelName := strcase.ToSnake(q.Result.Name())
 
 	qryformats := q.qryParams
-	qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
+	if len(qryformats) == 0 { // 特别指定不从参数获取
+		qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
+	}
 
 	for _, qry := range qryformats {
 		if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
@@ -65,13 +67,17 @@ func (q *simpleQuery) update() error {
 	updates := make(map[string]interface{})
 
 	qryformats := q.qryParams
-	qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
+	if len(qryformats) == 0 { // 特别指定不从参数获取
+		qryformats = append(qryformats, q.ModelStructs.buildFormQuery(modelName)...)
+	}
 
 	for _, qry := range qryformats {
 		if qry.withCondition || ToCamel(qry.bindfield) == "ID" {
 			whereCount++
 			if str := qry.nullExpr(); len(str) > 0 {
 				tx = tx.Where(str)
+			} else if g := qry.gormExpr(); g != nil {
+				tx = tx.Where("?", g)
 			} else {
 				w := qry.whereExpr()
 				tx = tx.Where(w, qry.value...)
@@ -97,7 +103,7 @@ func (q *simpleQuery) update() error {
 	if whereCount == 0 {
 		return fmt.Errorf("unable update %s, missing query condition", modelName)
 	}
-	
+
 	if len(updates) > 0 {
 		tx = tx.Updates(updates)
 		q.search.ReturnCount = int(tx.RowsAffected)

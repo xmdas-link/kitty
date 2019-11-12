@@ -70,6 +70,14 @@ func (f *fieldQryFormat) nullExpr() string {
 	return ""
 }
 
+func (f *fieldQryFormat) gormExpr() interface{} {
+	if len(f.value) == 1 {
+		if g, ok := f.value[0].(interface{}); ok {
+			return g
+		}
+	}
+	return nil
+}
 func (f *fieldQryFormat) whereExpr() string {
 	return fmt.Sprintf("%s %s", f.bindfield, f.operator)
 }
@@ -160,11 +168,20 @@ func (s *Structs) CallMethod(name string, values ...reflect.Value) []reflect.Val
 func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 
 	var sameKind = func() bool {
-		if reflect.ValueOf(value).Kind() != f.Kind() {
+		rv := reflect.ValueOf(value)
+		if rv.Kind() != f.Kind() {
 			return false
 		}
+		// *interface{}
+		switch f.Value().(type) {
+		case *interface{}:
+			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Interface {
+				return true
+			}
+		}
+
 		if f.Kind() == reflect.Ptr || f.Kind() == reflect.Slice {
-			v1 := DereferenceValue(reflect.ValueOf(value)).Kind()
+			v1 := DereferenceValue(rv).Kind()
 			if v1 != TypeKind(f).KindOfField {
 				return false
 			}
