@@ -51,6 +51,10 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 		jsonbytes []byte
 	)
 
+	if !kitty.HasRegister(req.Model) {
+		return fmt.Errorf("kittyrpc service: %s not exist", req.Model)
+	}
+
 	search := kitty.SearchCondition{}
 	err = json.Unmarshal([]byte(req.Search), &search)
 	if err != nil {

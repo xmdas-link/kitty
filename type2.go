@@ -29,3 +29,8 @@ func CreateModel(name string) *Structs {
 	log.Panicf("model: %s must be registered.", name)
 	return nil
 }
+
+// HasRegister .
+func HasRegister(name string) bool {
+	return types[name] != nil
+}

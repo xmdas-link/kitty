@@ -208,6 +208,12 @@ func (rpc *KittyClientRPC) localCall(s *kitty.Structs, search *kitty.SearchCondi
 						}
 						rpc.param.Field("Model").Set(tk.ModelName)
 						isKittyRequest = true
+
+						if runtime := kitty.GetSub(k, "runtime"); len(runtime) > 0 {
+							if err := kitty.Eval(s, nil, f, runtime); err != nil {
+								return err
+							}
+						}
 					} else if strings.Contains(param, paramformat) {
 						if runtime := kitty.GetSub(k, "runtime"); len(runtime) > 0 {
 							if err := kitty.Eval(s, nil, f, runtime); err != nil {
