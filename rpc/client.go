@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strings"
 
-	vd "github.com/bytedance/go-tagexpr/validator"
 	"github.com/fatih/structs"
 	"github.com/iancoleman/strcase"
 	jsoniter "github.com/json-iterator/go"
@@ -53,32 +52,13 @@ func init() {
 // Call 调用rpc服务端
 func (rpc *KittyClientRPC) Call(search *kitty.SearchCondition, action string, c kitty.Context) (interface{}, error) {
 	if action == "RPC" {
-		s := kitty.CreateModelStructs(rpc.Model).New()
-		if err := s.ParseFormValues(search.FormValues); err != nil {
-			return nil, err
+		crud := &kitty.LocalCrud{
+			Model:  kitty.CreateModelStructs(rpc.Model).Name(),
+			Callbk: rpc.Callbk,
+			RPC:    rpc,
 		}
-		if err := vd.Validate(s.Raw()); err != nil {
-			return nil, err
-		}
-
-		if err := kitty.Getter(s, search.Params, nil, c); err != nil {
-			return nil, err
-		}
-
-		err := rpc.localCall(s, search, c)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := kitty.Setter(s, search.Params, nil, c); err != nil {
-			return nil, err
-		}
-		if rpc.Callbk != nil {
-			if err := rpc.Callbk(s, nil); err != nil {
-				return nil, err
-			}
-		}
-		return s.Raw(), nil
+		fmt.Printf("rpc %s web call\n", crud.Model)
+		return crud.Do(search, action, c)
 	}
 
 	res, err := json.Marshal(search)
@@ -88,6 +68,7 @@ func (rpc *KittyClientRPC) Call(search *kitty.SearchCondition, action string, c 
 	if len(rpc.modelname) == 0 {
 		rpc.modelname = kitty.CreateModelStructs(rpc.Model).Name()
 	}
+	fmt.Printf("rpc %s remote call\n", rpc.modelname)
 	req := kittyrpc.Request{
 		Model:  rpc.modelname,
 		Action: action,
@@ -139,7 +120,8 @@ type localRPC struct {
 	result      *structs.Field
 }
 
-func (rpc *KittyClientRPC) localCall(s *kitty.Structs, search *kitty.SearchCondition, c kitty.Context) error {
+//WebCall rpc local call
+func (rpc *KittyClientRPC) WebCall(s *kitty.Structs, search *kitty.SearchCondition, c kitty.Context) error {
 
 	defer func() {
 		if r := recover(); r != nil {

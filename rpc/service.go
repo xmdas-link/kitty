@@ -81,20 +81,11 @@ func (rpc *KittyRPCService) Call(ctx context.Context, req *kittyrpc.Request, rsp
 		Model:  req.Model,
 		DB:     rpc.DB,
 		Callbk: rpc.Callbk,
+		RPC:    &KittyClientRPC{},
 	}
 	fmt.Printf("rpc %s call\n", req.Model)
 
-	s, err := crud.Validate(&search, rpcCtx)
-	if err != nil {
-		return err
-	}
-	cliRPC := &KittyClientRPC{}
-	err = cliRPC.localCall(s, &search, rpcCtx)
-	if err != nil {
-		return err
-	}
-
-	if res, err = crud.Action(s, &search, req.Action, rpcCtx); err == nil && res != nil {
+	if res, err = crud.Do(&search, req.Action, rpcCtx); err == nil && res != nil {
 		if jsonbytes, err = json.Marshal(res); err == nil {
 			rsp.Msg = string(jsonbytes)
 			return nil
