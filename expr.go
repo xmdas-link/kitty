@@ -687,6 +687,9 @@ func (e *expr) init() {
 		fun := functions[name]
 		return fun(args[1:]...)
 	}
+	functions["rds_if"] = func(args ...interface{}) (interface{}, error) {
+		return If("rds", args...)
+	}
 	functions["qry_if"] = func(args ...interface{}) (interface{}, error) {
 		return If("qry", args...)
 	}

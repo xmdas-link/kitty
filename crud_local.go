@@ -53,13 +53,17 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			log.Printf("Panic: %s, Action: %s==> %s\n", r, action, string(buf[:n]))
 			err = errors.New("panic")
 		}
-		if tx != nil && err != nil {
-			tx.Rollback()
+		if tx != nil {
+			if err == nil {
+				tx.Commit()
+			} else {
+				tx.Rollback()
+			}
 		}
 	}()
 
 	// getter -> plugin -> crud -> setter -> callback
-	if err = Getter(s, make(map[string]interface{}), local.DB, c); err != nil {
+	if err = Getter(s, make(map[string]interface{}), tx, c); err != nil {
 		return nil, err
 	}
 	if local.RPC != nil {
@@ -83,21 +87,18 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	case "U":
 		res, err = crud.updateObj()
 	case "RPC": // do nothing
+		res = s.raw
 	default:
 		err = errors.New("unknown model action")
 	}
 
-	if err = Setter(s, make(map[string]interface{}), local.DB, c); err != nil {
+	if err = Setter(s, make(map[string]interface{}), tx, c); err != nil {
 		return nil, err
 	}
 	if local.Callbk != nil {
-		if err = local.Callbk(s, local.DB); err != nil {
+		if err = local.Callbk(s, tx); err != nil {
 			return nil, err
 		}
-	}
-
-	if err == nil && tx != nil {
-		err = tx.Commit().Error
 	}
 
 	if err == nil {
