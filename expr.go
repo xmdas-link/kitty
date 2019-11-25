@@ -499,12 +499,23 @@ func (e *expr) init() {
 					res = objValue.Elem().Interface()
 				} else {
 					if rt.Kind() >= reflect.Int && rt.Kind() <= reflect.Float64 || rt.Kind() == reflect.String {
-						count := 0
-						if err = tx.Count(&count).Error; err == nil && count > 0 {
-							objValue := makeSlice(tk.TypeOfField, 0)
-							err = tx.Pluck(fieldSel, objValue.Interface()).Error
-							res = objValue.Elem().Interface()
+						sType := reflect.StructOf([]reflect.StructField{
+							{
+								Name: tk.ModelName,
+								Type: tk.TypeOfField.Elem(),
+							},
+						})
+						sv := reflect.New(sType)
+						objValue := makeSlice(reflect.TypeOf(sv.Interface()), 0)
+						err = tx.Scan(objValue.Interface()).Error
+
+						count := objValue.Elem().Len()
+						v1 := makeSlice(tk.TypeOfField, count)
+						for i := 0; i < count; i++ {
+							sv := CreateModelStructs(objValue.Elem().Index(i).Interface())
+							v1.Elem().Index(i).Set(reflect.ValueOf(sv.Field(tk.ModelName).Value()))
 						}
+						res = v1.Elem().Interface()
 					}
 				}
 			} else {
@@ -518,14 +529,17 @@ func (e *expr) init() {
 			return nil, e.f.Set(pi)
 		default:
 			if tk.TypeOfField.Kind() >= reflect.Int && tk.TypeOfField.Kind() <= reflect.Float64 || tk.TypeOfField.Kind() == reflect.String {
-				count := 0
-				if err = tx.Count(&count).Error; err == nil && count > 0 {
-					objValue := makeSlice(tk.TypeOfField, 0)
-					err = tx.Pluck(fieldSel, objValue.Interface()).Error
-					if objValue.Elem().Len() > 0 {
-						res = objValue.Elem().Index(0).Interface()
-					}
-				}
+				sType := reflect.StructOf([]reflect.StructField{
+					{
+						Name: tk.ModelName,
+						Type: tk.TypeOfField,
+					},
+				})
+				sv := reflect.New(sType)
+				svi := sv.Interface()
+				err = tx.Scan(svi).Error
+				ss := CreateModelStructs(svi)
+				res = ss.Field(tk.ModelName).Value()
 			}
 		}
 

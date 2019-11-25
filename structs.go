@@ -399,7 +399,7 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 	}
 	if f, ok := list.fieldStrs.FieldOk(ToCamel(fieldName)); ok {
 		if f.IsZero() {
-			return nil, nil
+			return f.Value(), nil
 		}
 		tk := TypeKind(f)
 		if tk.KindOfField == reflect.Interface {
@@ -657,6 +657,8 @@ func TypeKind(field *structs.Field) FieldTypeAndKind {
 		rt = DereferenceType(rt.Elem())
 		if rt.Kind() == reflect.Struct {
 			TypeKind.ModelName = rt.Name()
+		} else {
+			TypeKind.ModelName = field.Name()
 		}
 	} else if rt.Kind() == reflect.Struct {
 		TypeKind.ModelName = rt.Name()
