@@ -217,7 +217,7 @@ func (e *expr) init() {
 				queryformat = append(queryformat, &fieldQryFormat{
 					bindfield: fname,
 					model:     strcase.ToSnake(tk.ModelName),
-					operator:  "= ?",
+					operator:  "=",
 					value:     []interface{}{res},
 				})
 			}
@@ -252,18 +252,12 @@ func (e *expr) init() {
 						return nil, err
 					}
 					if res != nil {
-						operator := oper + " ?"
-						if strings.Contains(oper, "IN") { // NOT IN / IN
-							operator = oper + " (?)"
-						} else if reflect.ValueOf(res).Kind() == reflect.Slice {
-							operator = "IN (?)"
-						}
 						fname := strcase.ToSnake(trimSpace(vv[0]))
 						queryformat = append(queryformat, &fieldQryFormat{
 							bindfield:     fname,
 							model:         strcase.ToSnake(tk.ModelName),
 							withCondition: true,
-							operator:      operator,
+							operator:      oper,
 							value:         []interface{}{res},
 						})
 					}
@@ -285,7 +279,7 @@ func (e *expr) init() {
 					queryformat = append(queryformat, &fieldQryFormat{
 						bindfield: fname,
 						model:     strcase.ToSnake(tk.ModelName),
-						operator:  "= ?",
+						operator:  "=",
 						value:     []interface{}{res},
 					})
 				}
@@ -393,26 +387,29 @@ func (e *expr) init() {
 								vv := strings.Split(expression, oper)
 								fname := strcase.ToSnake(trimSpace(vv[0]))
 								param := trimSpace(vv[1])
-								if len(param) >= 2 && param[0] == '[' && param[len(param)-1] == ']' {
-									str := param[1 : len(param)-1]
-									if len(str) == 0 {
-										str = "''"
-									}
-									tx = tx.Where(fmt.Sprintf("%s %s %s", fieldAs(fname), oper, str))
 
+								var (
+									res interface{}
+									err error
+								)
+								if len(param) >= 2 && param[0] == '[' && param[len(param)-1] == ']' {
+									res = param
 								} else {
-									res, err := e.s.getValue(param)
+									res, err = e.s.getValue(param)
 									if err != nil {
 										return nil, err
 									}
-									operator := oper + " ?"
-									if strings.Contains(oper, "IN") { // NOT IN / IN
-										operator = oper + " (?)"
-									} else if reflect.ValueOf(res).Kind() == reflect.Slice {
-										operator = "IN (?)"
-									}
-									tx = tx.Where(fmt.Sprintf("%s %s", fname, operator), res)
 								}
+
+								if res != nil {
+									qry := &fieldQryFormat{
+										bindfield: fieldAs(fname),
+										operator:  oper,
+										value:     []interface{}{res},
+									}
+									tx = tx.Where(qry.whereExpr(), qry.values()...)
+								}
+
 								break
 							}
 						}

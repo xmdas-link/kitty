@@ -75,16 +75,9 @@ func (q *simpleQuery) update() error {
 	for _, qry := range qryformats {
 		if qry.withCondition || ToCamel(qry.bindfield) == "ID" {
 			whereCount++
-			if str := qry.nullExpr(); len(str) > 0 {
-				tx = tx.Where(str)
-			} else if g := qry.gormExpr(); g != nil {
-				tx = tx.Where("?", g)
-			} else {
-				w := qry.whereExpr()
-				tx = tx.Where(w, qry.value...)
-			}
+			tx = tx.Where(qry.whereExpr(), qry.values()...)
 		} else if f, ok := q.Result.FieldOk(ToCamel(qry.bindfield)); ok {
-			if str := qry.nullExpr(); len(str) > 0 {
+			if qry.nullExpr() {
 				updates[qry.bindfield] = nil
 			} else {
 				updates[qry.bindfield] = qry.value[0]
@@ -136,42 +129,3 @@ func (q *simpleQuery) update() error {
 	}
 	return nil
 }
-
-/*
-	switch f.Value().(type) {
-	case *time.Time:
-		if v, ok := resvalue.(string); ok {
-			if len(v) == 0 {
-				updates[qry.bindfield] = nil
-				continue
-			}
-		}
-		VK := reflect.ValueOf(resvalue)
-		if VK.Kind() >= reflect.Int && VK.Kind() <= reflect.Float64 {
-			v := VK.Convert(reflect.TypeOf(float64(0))).Interface().(float64)
-			if v == 0 {
-				updates[qry.bindfield] = nil
-				continue
-			}
-		}
-		if err := q.Result.SetFieldValue(f, resvalue); err != nil {
-			return err
-		}
-		resvalue = DereferenceValue(reflect.ValueOf(f.Value()))
-	case time.Time:
-		if err := q.Result.SetFieldValue(f, resvalue); err != nil {
-			return err
-		}
-		resvalue = DereferenceValue(reflect.ValueOf(f.Value()))
-	}
-*/
-/*
-	if DereferenceType(reflect.TypeOf(resvalue)).Kind() == reflect.Struct {
-		if err := f.Set(resvalue); err != nil {
-			return err
-		}
-		updateWithStrs = true
-	} else {
-		updates[qry.bindfield] = resvalue
-	}
-*/

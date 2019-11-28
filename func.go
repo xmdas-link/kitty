@@ -59,6 +59,11 @@ func DereferenceValue(v reflect.Value) reflect.Value {
 	return v
 }
 
+//DereferenceInterface ...
+func DereferenceInterface(v interface{}) interface{} {
+	return DereferenceValue(reflect.ValueOf(v)).Interface()
+}
+
 // GetSub 获得tag标签段
 func GetSub(s string, sub string) string {
 	if strings.Contains(s, sub) {
@@ -108,8 +113,12 @@ func trimSpace(s string) string {
 	return s
 }
 
+func isConsts(str string) bool {
+	return len(str) >= 2 && str[0] == '[' && str[len(str)-1] == ']'
+}
+
 func trimConsts(str string) string {
-	if len(str) >= 2 && str[0] == '[' && str[len(str)-1] == ']' {
+	if isConsts(str) {
 		return str[1 : len(str)-1]
 	}
 	return str

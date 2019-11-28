@@ -176,54 +176,13 @@ func (j *kitty) joins(s *Structs, joinTo *kitty) *fieldQryFormat {
 		for _, v := range query {
 			if !v.order {
 				v.bindfield = fmt.Sprintf("%s.%s", j.TableName, v.bindfield)
-				if str := v.nullExpr(); len(str) > 0 {
-					where = append(where, str)
-				} else {
-					where = append(where, v.whereExpr())
-					params = append(params, v.value...)
-				}
+				where = append(where, fmt.Sprintf("(%s)", v.whereExpr())) // user_id = ? / created_time is not null /
+				params = append(params, v.values()...)
 			}
 		}
 	}
 
-	qryformat := &fieldQryFormat{operator: fmt.Sprintf("%s ON %s", join, strings.Join(where, " AND ")), value: params}
-	return qryformat
-}
-
-// join kitty model.
-// select * from users left join (select count(1) from work_issues group by name) as tmp on tmp.name=users.name
-func (j *kitty) joinKitty(s *Structs, joinTo *kitty, db *gorm.DB, ctx Context) *fieldQryFormat {
-	// 构造kitty模型的所需参数
-	for _, field := range s.Fields() {
-		bindParam := "param:" + strcase.ToSnake(j.ModelName) + "." //param:order_item.*
-		if k := field.Tag("kitty"); strings.Contains(k, bindParam) && !isNil(field) {
-			bindField := strings.Split(GetSub(k, "param"), ".")[1]
-			f := j.structs.Field(ToCamel(bindField))
-			j.structs.SetFieldValue(f, field.Value())
-		}
-	}
-	join := fmt.Sprintf("%s (?) AS %s", j.JoinAction, j.FieldName) // left join companies
-	where := []string{}
-	if len(j.JoinTo) > 0 {
-		if fi, err := s.GetRelationsWithModel(j.FieldName, joinTo.ModelName); err == nil {
-			if fi.Relationship != "nothing" {
-				associationKey := strcase.ToSnake(fi.ForeignKey)
-				where = append(where, fmt.Sprintf("%s.%s = %s.%s",
-					j.FieldName,
-					associationKey,
-					joinTo.TableName,
-					strcase.ToSnake(fi.AssociationForeignkey)))
-			}
-		}
-	}
-	q := newcrud(&config{
-		strs:   j.structs,
-		search: &SearchCondition{},
-		db:     db,
-		ctx:    ctx,
-	})
-	res, _ := q.queryExpr()
-	params := []interface{}{res}
+	// left join companies on companies.id=user.company_id and
 	qryformat := &fieldQryFormat{operator: fmt.Sprintf("%s ON %s", join, strings.Join(where, " AND ")), value: params}
 	return qryformat
 }

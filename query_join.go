@@ -28,13 +28,7 @@ func (q *joinQuery) prepare() *gorm.DB {
 		tx = tx.Joins(v.operator, v.value...)
 	}
 	for _, v := range q.Where {
-		if str := v.nullExpr(); len(str) > 0 {
-			tx = tx.Where(str)
-		} else if g := v.gormExpr(); g != nil {
-			tx = tx.Where("?", g)
-		} else {
-			tx = tx.Where(v.whereExpr(), v.value...)
-		}
+		tx = tx.Where(v.whereExpr(), v.values()...)
 	}
 	if len(q.GroupBy) > 0 {
 		tx = tx.Group(strings.Join(q.GroupBy, ", "))

@@ -55,32 +55,48 @@ type fieldQryFormat struct {
 	operator      string        // 比较方式
 	value         []interface{} // 具体的值
 	withCondition bool          // update where condition
-	order         bool
-	format        string // like format:sum($)
+	order         bool          // order
+	format        string        // like format:sum($)
 }
 
-func (f *fieldQryFormat) nullExpr() string {
+func (f *fieldQryFormat) nullExpr() bool {
 	if len(f.value) == 1 {
 		if str, ok := f.value[0].(string); ok && str == "[NULL]" {
-			op := strings.ReplaceAll(f.operator, "(?)", "")
-			op = strings.ReplaceAll(op, "?", "")
-			return fmt.Sprintf("%s %s %s", f.bindfield, trimSpace(op), trimConsts(str))
+			return true
 		}
 	}
-	return ""
+	return false
 }
 
-func (f *fieldQryFormat) gormExpr() interface{} {
-	if len(f.value) == 1 {
-		if g, ok := f.value[0].(*interface{}); ok {
-			return *g
-		}
+func (f *fieldQryFormat) operExpr() string {
+	if strings.Contains(f.operator, "IN") { // NOT IN / IN
+		return f.operator + " (?)"
+	} else if len(f.value) == 1 && reflect.ValueOf(f.value[0]).Kind() == reflect.Slice {
+		return "IN (?)"
 	}
-	return nil
+	return f.operator + " ?"
 }
 
 func (f *fieldQryFormat) whereExpr() string {
-	return fmt.Sprintf("%s %s", f.bindfield, f.operator)
+	if len(f.value) == 1 {
+		if _, ok := f.value[0].(*interface{}); ok && f.operator == "EXPR" {
+			return "?"
+		} else if str, ok := (f.value[0]).(string); ok && isConsts(str) {
+			return fmt.Sprintf("%s %s %s", f.bindfield, f.operator, trimConsts(str))
+		}
+	}
+	return fmt.Sprintf("%s %s", f.bindfield, f.operExpr())
+}
+
+func (f *fieldQryFormat) values() []interface{} {
+	if len(f.value) == 1 {
+		if g, ok := f.value[0].(*interface{}); ok {
+			return []interface{}{*g}
+		} else if str, ok := (f.value[0]).(string); ok && isConsts(str) {
+			return []interface{}{}
+		}
+	}
+	return f.value
 }
 
 func (f *fieldQryFormat) orderExpr() string {
@@ -174,11 +190,8 @@ func (s *Structs) SetFieldValue(f *structs.Field, value interface{}) error {
 			return false
 		}
 		// *interface{}
-		switch f.Value().(type) {
-		case *interface{}:
-			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Interface {
-				return true
-			}
+		if _, ok := f.Value().(*interface{}); ok && rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Interface {
+			return true
 		}
 
 		if f.Kind() == reflect.Ptr || f.Kind() == reflect.Slice {
@@ -403,7 +416,7 @@ func (list *fieldList) getValue(param string) (interface{}, error) {
 		}
 		tk := TypeKind(f)
 		if tk.KindOfField == reflect.Interface {
-			return reflect.ValueOf(f.Value()).Elem().Interface(), nil
+			return f.Value(), nil //reflect.ValueOf(f.Value()).Elem().Interface(), nil
 		}
 		if tk.KindOfField == reflect.Slice && list.dst != nil {
 			slicevalue := DereferenceValue(reflect.ValueOf(f.Value()))
@@ -533,6 +546,10 @@ func (s *Structs) ParseFormValues(values url.Values) error {
 		if len(k) > 0 && strings.Contains(k, "param") && !strings.Contains(k, "-;param") {
 			formfield := strcase.ToSnake(field.Name())
 			if formvalue, ok := values[formfield]; ok {
+				if len(formvalue) == 1 && len(formvalue[0]) == 0 && field.Kind() == reflect.Ptr {
+					//如果前端参数为空，没有传，并且字段为指针不处理
+					continue
+				}
 				fk := TypeKind(field)
 				if fk.KindOfField == reflect.Slice {
 					if err := s.SetFieldValue(field, formvalue[:]); err != nil {
@@ -699,17 +716,15 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 		operator = GetSub(k, "operator")
 	}
 
+	if typeKind.KindOfField == reflect.Interface {
+		// 碰到这个类型，为gorm的expr
+		return &fieldQryFormat{operator: operator, value: []interface{}{field.Value()}}
+	}
+
 	if typeKind.KindOfField == reflect.Struct {
 		return nil
 	}
-	singleValue := DereferenceValue(reflect.ValueOf(field.Value()))
-	if typeKind.KindOfField == reflect.Slice {
-		return &fieldQryFormat{operator: "IN (?)", value: []interface{}{singleValue.Interface()}}
-	} else if typeKind.KindOfField == reflect.Interface {
-		// 碰到这个类型，为gorm的expr
-		return &fieldQryFormat{operator: fmt.Sprintf("%s (?)", operator), value: []interface{}{field.Value()}}
-	}
-	return &fieldQryFormat{operator: fmt.Sprintf("%s ?", operator), value: []interface{}{singleValue.Interface()}}
+	return &fieldQryFormat{operator: operator, value: []interface{}{DereferenceInterface(field.Value())}}
 }
 
 // Copy Structs
