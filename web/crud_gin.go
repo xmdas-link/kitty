@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xmdas-link/kitty"
@@ -33,7 +34,11 @@ func (web *CRUDWeb) One(c *gin.Context) {
 
 // Update ...
 func (web *CRUDWeb) Update(c *gin.Context) {
-	c.Request.ParseForm()
+	if strings.Contains(c.GetHeader("Content-Type"), "multipart/form-data") {
+		c.Request.ParseMultipartForm(32 << 20)
+	} else {
+		c.Request.ParseForm()
+	}
 
 	c1 := &kitty.API{
 		Form: c.Request.PostForm,
@@ -45,7 +50,11 @@ func (web *CRUDWeb) Update(c *gin.Context) {
 
 // Create ...
 func (web *CRUDWeb) Create(c *gin.Context) {
-	c.Request.ParseForm()
+	if strings.Contains(c.GetHeader("Content-Type"), "multipart/form-data") {
+		c.Request.ParseMultipartForm(32 << 20)
+	} else {
+		c.Request.ParseForm()
+	}
 
 	if len(c.Request.PostForm) == 0 {
 		r := &ginResponse{C: c}
