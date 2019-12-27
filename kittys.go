@@ -35,7 +35,7 @@ func isKitty(ms *Structs) bool {
 // Parse ...
 func (ks *kittys) parse(ms *Structs) error {
 	for _, f := range ks.ModelStructs.Fields() {
-		fmt.Printf("field name: %+v\n", f.Name())
+		//fmt.Printf("field name: %+v\n", f.Name())
 		if k := f.Tag("kitty"); len(k) > 0 && (strings.Contains(k, "master") || strings.Contains(k, "join")) {
 			if f.Kind() == reflect.Struct {
 				tk := TypeKind(f)
