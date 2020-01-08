@@ -65,10 +65,16 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 
 	// getter -> plugin -> crud -> setter -> callback
 	if err = Getter(s, make(map[string]interface{}), tx, c); err != nil {
+		if f, ok := s.FieldOk("KittyCode"); ok {
+			return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
+		}
 		return nil, err
 	}
 	if local.RPC != nil {
 		if err = local.RPC.WebCall(s, search, c); err != nil {
+			if f, ok := s.FieldOk("KittyCode"); ok {
+				return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
+			}
 			return nil, err
 		}
 	}
@@ -94,10 +100,16 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 	}
 
 	if err = Setter(s, make(map[string]interface{}), tx, c); err != nil {
+		if f, ok := s.FieldOk("KittyCode"); ok {
+			return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
+		}
 		return nil, err
 	}
 	if local.Callbk != nil {
 		if err = local.Callbk(s, tx); err != nil {
+			if f, ok := s.FieldOk("KittyCode"); ok {
+				return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
+			}
 			return nil, err
 		}
 	}
