@@ -2,6 +2,7 @@ package kitty
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"runtime"
 	"time"
@@ -115,7 +116,7 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			s.nameAs(nameAs)
 		} else if action == "R" {
 			result.Code = 0
-			result.Message = "发生未知错误"
+			result.Message = "007"
 		}
 		return &Result{
 			result,
@@ -128,7 +129,10 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		if kittyMode == debugCode {
 			return nil, err
 		}
-		return nil, errors.New("数据库执行错误")
+		return nil, errors.New("0071")
+	}
+	if f, ok := s.FieldOk("KittyCode"); ok {
+		return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
 	}
 	return res, err
 }

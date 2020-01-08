@@ -3,6 +3,8 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xmdas-link/filter"
@@ -27,6 +29,13 @@ func (c *ginResponse) Response(e kitty.Context, data interface{}, err error) {
 }
 
 func (c *ginResponse) Fail(err error) {
+	if es := err.Error(); strings.HasPrefix(es, "kittycode:") {
+		ss := strings.Split(es, ",")
+		kc := strings.Split(ss[0], ":")[1]
+		code, _ := strconv.ParseInt(kc, 10, 64)
+		c.C.JSON(http.StatusOK, gin.H{"code": code, "message": ss[1]})
+		return
+	}
 	c.C.JSON(http.StatusOK, gin.H{"code": 0, "message": err.Error()})
 }
 
@@ -48,6 +57,17 @@ func (c *nativeResponse) Response(e kitty.Context, data interface{}, err error) 
 }
 
 func (c *nativeResponse) Fail(err error) {
+	if es := err.Error(); strings.HasPrefix(es, "kittycode:") {
+		ss := strings.Split(es, ",")
+		kc := strings.Split(ss[0], ":")[1]
+		code, _ := strconv.ParseInt(kc, 10, 64)
+		res := map[string]interface{}{
+			"code":    code,
+			"message": ss[1],
+		}
+		c.write(res)
+		return
+	}
 	res := map[string]interface{}{
 		"code":    0,
 		"message": err.Error(),
