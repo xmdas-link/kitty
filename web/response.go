@@ -6,22 +6,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/xmdas-link/filter"
+	"github.com/xmdas-link/kitty"
 )
 
-type webResponse interface {
-	success(interface{})
-	fail(error)
+// WebResponse default json output
+type WebResponse interface {
+	Response(kitty.Context, interface{}, error)
 }
 
 type ginResponse struct {
 	C *gin.Context
 }
 
-func (c *ginResponse) success(data interface{}) {
+func (c *ginResponse) Response(e kitty.Context, data interface{}, err error) {
+	if err != nil {
+		c.Fail(err)
+		return
+	}
 	c.C.JSON(http.StatusOK, filter.H{Ctx: c.C, Data: data})
 }
 
-func (c *ginResponse) fail(err error) {
+func (c *ginResponse) Fail(err error) {
 	c.C.JSON(http.StatusOK, gin.H{"code": 0, "message": err.Error()})
 }
 
@@ -34,11 +39,15 @@ func (c *nativeResponse) write(data interface{}) {
 	c.W.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(c.W).Encode(data)
 }
-func (c *nativeResponse) success(data interface{}) {
+func (c *nativeResponse) Response(e kitty.Context, data interface{}, err error) {
+	if err != nil {
+		c.Fail(err)
+		return
+	}
 	c.write(data)
 }
 
-func (c *nativeResponse) fail(err error) {
+func (c *nativeResponse) Fail(err error) {
 	res := map[string]interface{}{
 		"code":    0,
 		"message": err.Error(),

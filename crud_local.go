@@ -107,6 +107,9 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 			Code: 1,
 			Ref:  time.Now().UnixNano() / 1e6,
 		}
+		if f, ok := s.FieldOk("KittyCode"); ok {
+			result.Code = f.Value().(int)
+		}
 		if res != nil {
 			result.Data = res
 			s.nameAs(nameAs)

@@ -8,12 +8,13 @@ import (
 
 // Config 配置
 type Config struct {
-	Model  interface{}
-	Ctx    externCtx
-	DB     *gorm.DB
-	RPC    kitty.RPC
-	Callbk kitty.SuccessCallback
-	Params map[string]interface{}
+	Model       interface{}
+	Ctx         externCtx
+	DB          *gorm.DB
+	RPC         kitty.RPC
+	Callbk      kitty.SuccessCallback
+	Params      map[string]interface{}
+	WebResponse WebResponse
 }
 
 // NewLocalWeb ..
@@ -25,8 +26,9 @@ func NewLocalWeb(conf *Config) *CRUDWeb {
 			DB:     conf.DB,
 			Callbk: conf.Callbk,
 		},
-		Ctx:    conf.Ctx,
-		Params: conf.Params,
+		Ctx:         conf.Ctx,
+		Params:      conf.Params,
+		WebResponse: conf.WebResponse,
 	}
 }
 
@@ -37,8 +39,9 @@ func NewRPCWeb(conf *Config) *CRUDWeb {
 		Crud: &kitty.RPCCrud{
 			RPC: conf.RPC,
 		},
-		Ctx:    conf.Ctx,
-		Params: conf.Params,
+		Ctx:         conf.Ctx,
+		Params:      conf.Params,
+		WebResponse: conf.WebResponse,
 	}
 }
 
@@ -46,18 +49,24 @@ type crudAction func() (interface{}, error)
 
 // CRUDWeb web接口
 type CRUDWeb struct {
-	Crud   kitty.CRUDInterface
-	Ctx    externCtx
-	Params map[string]interface{}
+	Crud        kitty.CRUDInterface
+	Ctx         externCtx
+	Params      map[string]interface{}
+	WebResponse WebResponse
 }
 
-func (web *CRUDWeb) result(action crudAction, response webResponse) {
+func (web *CRUDWeb) result(action crudAction, c kitty.Context, response WebResponse) {
 	res, err := action()
+	if web.WebResponse != nil {
+		result := res.(*kitty.Result)
+		web.WebResponse.Response(c, result.CrudResult.Data, err)
+		return
+	}
 	if err != nil {
-		response.fail(err)
+		response.Response(c, nil, err)
 	} else if res != nil {
-		response.success(res)
+		response.Response(c, res, nil)
 	} else {
-		response.success(gin.H{"code": 0, "message": "发生未知异常"})
+		response.Response(c, gin.H{"code": 0, "message": "007"}, nil)
 	}
 }
