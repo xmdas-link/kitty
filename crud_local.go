@@ -38,6 +38,12 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		return nil, err
 	}
 
+	var formatErr = func(s *Structs, err error) error {
+		if f, ok := s.FieldOk("KittyCode"); ok {
+			return fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
+		}
+		return err
+	}
 	var (
 		res interface{}
 		err error
@@ -65,17 +71,11 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 
 	// getter -> plugin -> crud -> setter -> callback
 	if err = Getter(s, make(map[string]interface{}), tx, c); err != nil {
-		if f, ok := s.FieldOk("KittyCode"); ok {
-			return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
-		}
-		return nil, err
+		return nil, formatErr(s, err)
 	}
 	if local.RPC != nil {
 		if err = local.RPC.WebCall(s, search, c); err != nil {
-			if f, ok := s.FieldOk("KittyCode"); ok {
-				return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
-			}
-			return nil, err
+			return nil, formatErr(s, err)
 		}
 	}
 
@@ -99,18 +99,16 @@ func (local *LocalCrud) Do(search *SearchCondition, action string, c Context) (i
 		err = errors.New("unknown model action")
 	}
 
+	if err != nil {
+		return nil, formatErr(s, err)
+	}
+
 	if err = Setter(s, make(map[string]interface{}), tx, c); err != nil {
-		if f, ok := s.FieldOk("KittyCode"); ok {
-			return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
-		}
-		return nil, err
+		return nil, formatErr(s, err)
 	}
 	if local.Callbk != nil {
 		if err = local.Callbk(s, tx); err != nil {
-			if f, ok := s.FieldOk("KittyCode"); ok {
-				return nil, fmt.Errorf("kittycode:%d,%s", f.Value().(int), err.Error())
-			}
-			return nil, err
+			return nil, formatErr(s, err)
 		}
 	}
 
