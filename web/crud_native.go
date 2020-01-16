@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/xmdas-link/kitty"
 )
@@ -32,7 +33,11 @@ func (web *CRUDWeb) One2(w http.ResponseWriter, r *http.Request) {
 
 // Update2 ...
 func (web *CRUDWeb) Update2(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+		r.ParseMultipartForm(32 << 20)
+	} else {
+		r.ParseForm()
+	}
 
 	c1 := &kitty.API{
 		Form: r.PostForm,
@@ -44,7 +49,11 @@ func (web *CRUDWeb) Update2(w http.ResponseWriter, r *http.Request) {
 
 // Create2 ...
 func (web *CRUDWeb) Create2(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+		r.ParseMultipartForm(32 << 20)
+	} else {
+		r.ParseForm()
+	}
 
 	if len(r.PostForm) == 0 {
 		rsp := &nativeResponse{W: w}
