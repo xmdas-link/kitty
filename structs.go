@@ -721,9 +721,10 @@ func formatQryParam(field *structs.Field) *fieldQryFormat {
 		return &fieldQryFormat{operator: operator, value: []interface{}{field.Value()}}
 	}
 
-	if typeKind.KindOfField == reflect.Struct {
-		return nil
-	}
+	// 如果 gorm model 的字段是一个结构体, 在读取写入的时候，需要作为一个参数
+//	if typeKind.KindOfField == reflect.Struct {
+//		return nil
+//	}
 	return &fieldQryFormat{operator: operator, value: []interface{}{DereferenceInterface(field.Value())}}
 }
 

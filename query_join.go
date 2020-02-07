@@ -67,6 +67,9 @@ func (q *joinQuery) one() (interface{}, error) {
 		if !rows.Next() {
 			return nil, nil
 		}
+		defer func() {
+			rows.Close()
+		}()
 		if err = tx.ScanRows(rows, q.ModelStructs.raw); err != nil {
 			return nil, err
 		}

@@ -58,9 +58,9 @@ type CRUDWeb struct {
 func (web *CRUDWeb) result(action crudAction, c kitty.Context, response WebResponse) {
 	res, err := action()
 	if web.WebResponse != nil {
-		if err == nil {
+		if err == nil && res != nil {
 			result := res.(*kitty.Result)
-			web.WebResponse.Response(c, result.CrudResult.Data, err)
+			web.WebResponse.Response(c, result.Data, err)
 		} else {
 			web.WebResponse.Response(c, nil, err)
 		}
